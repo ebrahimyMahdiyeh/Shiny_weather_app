@@ -1,0 +1,26 @@
+{
+    "id": "B2B4CE59",
+    "path": "C:/Users/kiyan/Downloads/shiny_weather_dashboard_v3 (1)/shiny_app_new/R/modeling_utils.R",
+    "project_path": "shiny_app_new/R/modeling_utils.R",
+    "type": "r_source",
+    "hash": "2650477000",
+    "contents": "",
+    "dirty": false,
+    "created": 1784785023541.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "1109,1",
+        "scrollLine": "1088"
+    },
+    "folds": "19|71|44|0|\n47|72|72|0|\n75|69|92|0|\n95|71|137|0|\n140|73|167|0|\n176|74|226|0|\n229|73|241|0|\n244|75|249|0|\n252|51|258|0|\n265|68|303|0|\n306|73|362|0|\n365|74|426|0|\n429|74|491|0|\n494|69|527|0|\n530|71|540|0|\n547|55|567|0|\n577|45|651|0|\n654|70|692|0|\n694|52|706|0|\n",
+    "lastKnownWriteTime": 1784788007,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1784788007347,
+    "read_only": false,
+    "read_only_alternatives": []
+}

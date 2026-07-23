@@ -1,0 +1,16 @@
+---
+title: "q3"
+output: html_document
+date: "2026-07-13"
+---
+
+```{r}
+f <- function(x)
+{
+  integrate(function(y)
+    (x - 1)^2 * y * sin((x^2)* y),
+    0, 4)$value
+}
+
+integrate(function(x) sapply(x, f),0, pi/2)
+```

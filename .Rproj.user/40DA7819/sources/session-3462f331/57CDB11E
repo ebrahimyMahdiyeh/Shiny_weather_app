@@ -1,0 +1,26 @@
+{
+    "id": "57CDB11E",
+    "path": "C:/Users/kiyan/Downloads/shiny_weather_dashboard_v3 (1)/shiny_app_new/modules/leaderboard_module.R",
+    "project_path": "shiny_app_new/modules/leaderboard_module.R",
+    "type": "r_source",
+    "hash": "1494847036",
+    "contents": "",
+    "dirty": false,
+    "created": 1784785274075.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "466,1",
+        "scrollLine": "442"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1784785430,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1784785430166,
+    "read_only": false,
+    "read_only_alternatives": []
+}
