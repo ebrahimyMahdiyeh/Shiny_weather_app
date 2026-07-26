@@ -176,21 +176,3 @@ Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026
                       "forecast", "prophet", "ranger", "xgboost", "e1071",
                       "writexl", "rmarkdown"))
    ```
-3. (Optional) For boosting models, install these separately:
-   ```r
-   install.packages("lightgbm")
-   # Follow the official CatBoost documentation to install it
-   ```
-4. Clone the repository, open `app.R` in RStudio, and click **Run App**.
-
----
-
-## 📜 License
-Released under the MIT License. Reuse for research papers and academic projects is welcome, with attribution.
-
-## 👨‍💻 Author
-**Your Name**
-- LinkedIn: [your profile link]
-- Email: [your email]
-
-If this project was useful to you, consider giving the repo a ⭐!
