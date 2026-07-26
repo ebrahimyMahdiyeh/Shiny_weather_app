@@ -1,5 +1,3 @@
-# File: global.R
-# بارگذاری کتابخانه‌ها و تنظیمات سراسری برنامه
 
 # ── عملگر null-coalescing (باید قبل از همه چیز تعریف شود) ───────────────────
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0 && !is.na(a[1])) a else b

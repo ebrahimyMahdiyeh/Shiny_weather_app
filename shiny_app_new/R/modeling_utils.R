@@ -10,6 +10,7 @@
 #   6. Hyperparameterهای بهتر برای داده‌ی هواشناسی
 #   7. Refactor کامل: کاهش تکرار کد با helperهای مشترک
 #   8. سازگاری کامل با پروژه‌ی Shiny حفظ شده
+#   9. پشتیبانی از پیش‌بینی چندمتغیره (Multivariate) در مدل‌های ساعتی
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -749,7 +750,7 @@ HOURLY_FEAT_COLS <- c(
   "temperature", "humidity", "wind_speed", "precipitation"
 )
 
-.prepare_hourly_training_data <- function(hourly_df, target = "temperature") {
+.prepare_hourly_training_data <- function(hourly_df, target = "temperature", use_multivariate = FALSE) {
   if (nrow(hourly_df) > 1440) {
     hourly_df <- tail(hourly_df, 1440)
     message("[Hourly ML] محدود شد به ۱۴۴۰ ساعت آخر")
@@ -758,8 +759,13 @@ HOURLY_FEAT_COLS <- c(
   feat_df <- build_hourly_feature_matrix(hourly_df, target)
   if (nrow(feat_df) < 10) stop("داده کافی بعد از حذف NA باقی نمانده")
   
-  # متغیر هدف را از ویژگی‌ها حذف می‌کنیم، اما متغیرهای کمکی (رطوبت، باد و...) باقی می‌مانند
-  feat_use <- setdiff(intersect(HOURLY_FEAT_COLS, names(feat_df)), target)
+  # اگر حالت تک‌متغیره باشد، سایر متغیرهای هواشناسی حذف می‌شوند
+  exog_vars <- setdiff(c("temperature", "humidity", "wind_speed", "precipitation"), target)
+  if (isTRUE(use_multivariate)) {
+    feat_use <- setdiff(intersect(HOURLY_FEAT_COLS, names(feat_df)), target)
+  } else {
+    feat_use <- setdiff(intersect(HOURLY_FEAT_COLS, names(feat_df)), c(target, exog_vars))
+  }
   
   list(
     feat_df   = feat_df,
@@ -770,15 +776,16 @@ HOURLY_FEAT_COLS <- c(
   )
 }
 
-hourly_recursive_forecast <- function(predict_fn, model, train_df, horizon_h, target, feat_use, exog_future = NULL) {
+hourly_recursive_forecast <- function(predict_fn, model, train_df, horizon_h, target, feat_use) {
   last_ts    <- max(train_df$timestamp)
   history    <- tail(train_df[[target]], 48)
   n_hist     <- length(history)
   buf        <- c(history, rep(NA_real_, horizon_h))
   
-  # متغیرهای کمکی (Exogenous)
+  # متغیرهای کمکی (Exogenous) - فقط اگر در feat_use باشند
   exog_vars <- setdiff(c("temperature", "humidity", "wind_speed", "precipitation"), target)
-  last_exog <- tail(train_df[, exog_vars, drop = FALSE], 1)
+  active_exog_vars <- intersect(exog_vars, feat_use)
+  last_exog <- if (length(active_exog_vars) > 0) tail(train_df[, active_exog_vars, drop = FALSE], 1) else NULL
   
   preds <- numeric(horizon_h)
   
@@ -826,11 +833,9 @@ hourly_recursive_forecast <- function(predict_fn, model, train_df, horizon_h, ta
       rolling_24h = roll_24h
     )
     
-    # افزودن مقادیر آینده متغیرهای کمکی (از API) یا استفاده از آخرین مقدار已知
-    for (ev in exog_vars) {
-      if (!is.null(exog_future) && h <= nrow(exog_future)) {
-        newrow[[ev]] <- exog_future[[ev]][h]
-      } else {
+    # استفاده از آخرین مقدار شناخته شده برای متغیرهای کمکی در تمام ۲۴ ساعت آینده
+    if (!is.null(last_exog)) {
+      for (ev in active_exog_vars) {
         newrow[[ev]] <- last_exog[[ev]][1]
       }
     }
@@ -885,23 +890,14 @@ hourly_fallback_forecast <- function(hourly_df, horizon_h, target, method_suffix
     all(is.finite(res$predictions))
 }
 
-forecast_hourly_xgboost <- function(hourly_df, horizon_h = 24, target = "temperature", exog_future = NULL) {
+forecast_hourly_xgboost <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   result <- tryCatch({
-    prep     <- .prepare_hourly_training_data(hourly_df, target)
+    prep     <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
     feat_use <- prep$feat_use
     X_train  <- prep$X_train
     y_train  <- prep$y_train
     
-    params <- list(
-      objective        = "reg:squarederror",
-      max_depth        = 6,
-      eta              = 0.05,
-      subsample        = 0.8,
-      colsample_bytree = 0.8,
-      min_child_weight = 3,
-      gamma            = 0.1
-    )
-    
+    params <- list(objective = "reg:squarederror", max_depth = 6, eta = 0.05, subsample = 0.8, colsample_bytree = 0.8, min_child_weight = 3, gamma = 0.1)
     split <- .train_valid_split_idx(nrow(X_train))
     
     if (!is.null(split)) {
@@ -915,28 +911,22 @@ forecast_hourly_xgboost <- function(hourly_df, horizon_h = 24, target = "tempera
     
     preds <- hourly_recursive_forecast(
       predict_fn = function(m, nd) stats::predict(m, xgboost::xgb.DMatrix(as.matrix(nd[, feat_use, drop = FALSE]))),
-      model      = model,
-      train_df   = prep$hourly_df,
-      horizon_h  = horizon_h,
-      target     = target,
-      feat_use   = feat_use,
-      exog_future= exog_future
+      model      = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = feat_use
     )
     
-    list(predictions = preds, method = "XGBoost (ساعتی)")
-  }, error = function(e) {
-    message("XGBoost ساعتی شکست خورد: ", conditionMessage(e))
-    NULL
-  })
+    imp <- tryCatch(xgboost::xgb.importance(model = model), error = function(e) NULL)
+    feat_imp <- if (!is.null(imp)) imp[, c("Feature", "Gain")] else NULL
+    mv_tag <- if (isTRUE(use_multivariate)) "، چندمتغیره" else ""
+    list(predictions = preds, method = paste0("XGBoost (ساعتی", mv_tag, ")"), feat_imp = feat_imp)
+  }, error = function(e) { message("XGBoost ساعتی شکست خورد: ", conditionMessage(e)); NULL })
   
-  if (!.valid_hourly_result(result, horizon_h))
-    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — XGBoost"))
+  if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — XGBoost"))
   result
 }
 
-forecast_hourly_rf <- function(hourly_df, horizon_h = 24, target = "temperature", exog_future = NULL) {
+forecast_hourly_rf <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   result <- tryCatch({
-    prep     <- .prepare_hourly_training_data(hourly_df, target)
+    prep     <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
     feat_use <- prep$feat_use
     X_train  <- prep$X_train
     y_train  <- prep$y_train
@@ -944,35 +934,25 @@ forecast_hourly_rf <- function(hourly_df, horizon_h = 24, target = "temperature"
     model <- ranger::ranger(x = X_train, y = y_train, num.trees = 500, mtry = max(1, floor(ncol(X_train) / 3)), min.node.size = 5, sample.fraction = 0.8, importance = "impurity", keep.inbag = FALSE)
     
     preds <- hourly_recursive_forecast(
-      predict_fn = function(m, nd) {
-        newdata <- as.data.frame(as.matrix(nd[, feat_use, drop = FALSE]))
-        names(newdata) <- feat_use
-        stats::predict(m, data = newdata)$predictions
-      },
-      model      = model,
-      train_df   = prep$hourly_df,
-      horizon_h  = horizon_h,
-      target     = target,
-      feat_use   = feat_use,
-      exog_future= exog_future
+      predict_fn = function(m, nd) { newdata <- as.data.frame(as.matrix(nd[, feat_use, drop = FALSE])); names(newdata) <- feat_use; stats::predict(m, data = newdata)$predictions },
+      model      = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = feat_use
     )
     
-    list(predictions = preds, method = "Random Forest (ساعتی، ranger)")
-  }, error = function(e) {
-    message("Random Forest ساعتی شکست خورد: ", conditionMessage(e))
-    NULL
-  })
+    imp <- tryCatch(model$variable.importance, error = function(e) NULL)
+    feat_imp <- if (!is.null(imp)) data.frame(Feature = names(imp), Gain = unname(imp)) else NULL
+    mv_tag <- if (isTRUE(use_multivariate)) "، چندمتغیره" else ""
+    list(predictions = preds, method = paste0("Random Forest (ساعتی", mv_tag, ")"), feat_imp = feat_imp)
+  }, error = function(e) { message("Random Forest ساعتی شکست خورد: ", conditionMessage(e)); NULL })
   
-  if (!.valid_hourly_result(result, horizon_h))
-    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — RF"))
+  if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — RF"))
   result
 }
 
-forecast_hourly_lightgbm <- function(hourly_df, horizon_h = 24, target = "temperature", exog_future = NULL) {
+forecast_hourly_lightgbm <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   if (!requireNamespace("lightgbm", quietly = TRUE)) stop("پکیج lightgbm نصب نیست.")
   
   result <- tryCatch({
-    prep     <- .prepare_hourly_training_data(hourly_df, target)
+    prep     <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
     feat_use <- prep$feat_use
     X_train  <- prep$X_train
     y_train  <- prep$y_train
@@ -991,30 +971,24 @@ forecast_hourly_lightgbm <- function(hourly_df, horizon_h = 24, target = "temper
     
     preds <- hourly_recursive_forecast(
       predict_fn = function(m, nd) stats::predict(m, as.matrix(nd[, feat_use, drop = FALSE])),
-      model      = model,
-      train_df   = prep$hourly_df,
-      horizon_h  = horizon_h,
-      target     = target,
-      feat_use   = feat_use,
-      exog_future= exog_future
+      model      = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = feat_use
     )
     
-    list(predictions = preds, method = "LightGBM (ساعتی)")
-  }, error = function(e) {
-    message("LightGBM ساعتی شکست خورد: ", conditionMessage(e))
-    NULL
-  })
+    imp <- tryCatch(lightgbm::lgb.importance(model, percentage = TRUE), error = function(e) NULL)
+    feat_imp <- if (!is.null(imp)) imp[, c("Feature", "Gain")] else NULL
+    mv_tag <- if (isTRUE(use_multivariate)) "، چندمتغیره" else ""
+    list(predictions = preds, method = paste0("LightGBM (ساعتی", mv_tag, ")"), feat_imp = feat_imp)
+  }, error = function(e) { message("LightGBM ساعتی شکست خورد: ", conditionMessage(e)); NULL })
   
-  if (!.valid_hourly_result(result, horizon_h))
-    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — LightGBM"))
+  if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — LightGBM"))
   result
 }
 
-forecast_hourly_catboost <- function(hourly_df, horizon_h = 24, target = "temperature", exog_future = NULL) {
+forecast_hourly_catboost <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   if (!requireNamespace("catboost", quietly = TRUE)) stop("پکیج catboost نصب نیست.")
   
   result <- tryCatch({
-    prep     <- .prepare_hourly_training_data(hourly_df, target)
+    prep     <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
     feat_use <- prep$feat_use
     X_train  <- prep$X_train
     y_train  <- prep$y_train
@@ -1035,33 +1009,211 @@ forecast_hourly_catboost <- function(hourly_df, horizon_h = 24, target = "temper
     }
     
     preds <- hourly_recursive_forecast(
-      predict_fn = function(m, nd) {
-        pool <- catboost::catboost.load_pool(data = as.data.frame(nd[, feat_use, drop = FALSE]))
-        catboost::catboost.predict(m, pool)
-      },
-      model      = model,
-      train_df   = prep$hourly_df,
-      horizon_h  = horizon_h,
-      target     = target,
-      feat_use   = feat_use,
-      exog_future= exog_future
+      predict_fn = function(m, nd) { pool <- catboost::catboost.load_pool(data = as.data.frame(nd[, feat_use, drop = FALSE])); catboost::catboost.predict(m, pool) },
+      model      = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = feat_use
     )
     
-    list(predictions = preds, method = "CatBoost (ساعتی)")
-  }, error = function(e) {
-    message("CatBoost ساعتی شکست خورد: ", conditionMessage(e))
-    NULL
-  })
+    imp <- tryCatch(catboost::catboost.get_feature_importance(model), error = function(e) NULL)
+    feat_imp <- if (!is.null(imp)) data.frame(Feature = colnames(X_train), Gain = imp) else NULL
+    mv_tag <- if (isTRUE(use_multivariate)) "، چندمتغیره" else ""
+    list(predictions = preds, method = paste0("CatBoost (ساعتی", mv_tag, ")"), feat_imp = feat_imp)
+  }, error = function(e) { message("CatBoost ساعتی شکست خورد: ", conditionMessage(e)); NULL })
   
-  if (!.valid_hourly_result(result, horizon_h))
-    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — CatBoost"))
+  if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — CatBoost"))
   result
 }
 
-# ── dispatcher: انتخاب مدل ساعتی (پشتیبانی از چندمتغیره) ──────────────────────
-run_hourly_model <- function(model_name, hourly_df, horizon_h = 24, target = "temperature", exog_future = NULL) {
+forecast_hourly_svm <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
+  result <- tryCatch({
+    prep     <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
+    feat_use <- prep$feat_use
+    X_train  <- prep$X_train
+    y_train  <- prep$y_train
+    
+    model <- e1071::svm(x = X_train, y = y_train, kernel = "radial", cost = 10, epsilon = 0.1)
+    
+    preds <- hourly_recursive_forecast(
+      predict_fn = function(m, nd) stats::predict(m, newdata = as.matrix(nd[, feat_use, drop = FALSE])),
+      model      = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = feat_use
+    )
+    
+    mv_tag <- if (isTRUE(use_multivariate)) "، چندمتغیره" else ""
+    list(predictions = preds, method = paste0("SVM (ساعتی", mv_tag, ")"))
+  }, error = function(e) { message("SVM ساعتی شکست خورد: ", conditionMessage(e)); NULL })
+  
+  if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SVM"))
+  result
+}
+
+# ── پیش‌بینی ساعتی SARIMA ─────────────────────────────────────────────────────
+forecast_hourly_sarima <- function(hourly_df, horizon_h = 24, target = "temperature") {
+  vals <- hourly_df[[target]]
+  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
+  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
+  hourly_df[[target]] <- vals
+  
+  n <- length(vals)
+  
+  if (n < 48)
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SARIMA"))
+  
+  MAX_HOURLY_FOR_SARIMA <- 720
+  if (n > MAX_HOURLY_FOR_SARIMA) {
+    vals <- tail(vals, MAX_HOURLY_FOR_SARIMA)
+    message("[SARIMA hourly] محدود شدن به ", MAX_HOURLY_FOR_SARIMA,
+            " ساعت آخر (از ", n, " ردیف)")
+    n <- length(vals)
+  }
+  
+  ts_obj <- ts(vals, frequency = 24)
+  
+  fit <- tryCatch(
+    forecast::Arima(ts_obj, order = c(1, 0, 1),
+                    seasonal = list(order = c(1, 0, 1), period = 24)),
+    error = function(e) tryCatch(
+      forecast::Arima(ts_obj, order = c(1, 1, 1)),
+      error = function(e2) tryCatch(
+        forecast::auto.arima(tail(ts_obj, 168), seasonal = FALSE,
+                             stepwise = TRUE, approximation = TRUE),
+        error = function(e3) NULL
+      )
+    )
+  )
+  
+  if (is.null(fit))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SARIMA"))
+  
+  fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
+  if (is.null(fc))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SARIMA"))
+  
+  preds <- as.numeric(fc$mean)
+  lower <- tryCatch(as.numeric(fc$lower[, 2]), error = function(e) NULL)
+  upper <- tryCatch(as.numeric(fc$upper[, 2]), error = function(e) NULL)
+  
+  valid <- length(preds) == horizon_h &&
+    all(is.finite(preds)) &&
+    !is.null(lower) && length(lower) == horizon_h && all(is.finite(lower)) &&
+    !is.null(upper) && length(upper) == horizon_h && all(is.finite(upper))
+  
+  if (!valid)
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SARIMA"))
+  
+  list(
+    predictions = preds,
+    lower       = lower,
+    upper       = upper,
+    method      = "SARIMA (ساعتی، freq=24)"
+  )
+}
+
+# ── پیش‌بینی ساعتی ARIMA ──────────────────────────────────────────────────────
+forecast_hourly_arima <- function(hourly_df, horizon_h = 24, target = "temperature") {
+  vals <- hourly_df[[target]]
+  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
+  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
+  if (length(vals) > 720) vals <- tail(vals, 720)
+  
+  ts_obj <- ts(vals, frequency = 24)
+  
+  fit <- tryCatch(
+    forecast::Arima(ts_obj, order = c(2, 0, 1),
+                    seasonal = list(order = c(1, 0, 0), period = 24)),
+    error = function(e) tryCatch(
+      forecast::Arima(ts_obj, order = c(1, 1, 1)),
+      error = function(e2) tryCatch(
+        forecast::auto.arima(tail(ts_obj, 168), seasonal = FALSE,
+                             stepwise = TRUE, approximation = TRUE),
+        error = function(e3) NULL
+      )
+    )
+  )
+  if (is.null(fit))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ARIMA"))
+  
+  fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
+  if (is.null(fc))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ARIMA"))
+  
+  list(
+    predictions = as.numeric(fc$mean),
+    lower       = as.numeric(fc$lower[, 2]),
+    upper       = as.numeric(fc$upper[, 2]),
+    method      = "ARIMA (ساعتی)"
+  )
+}
+
+# ── پیش‌بینی ساعتی ETS ────────────────────────────────────────────────────────
+forecast_hourly_ets <- function(hourly_df, horizon_h = 24, target = "temperature") {
+  vals <- hourly_df[[target]]
+  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
+  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
+  if (length(vals) > 720) vals <- tail(vals, 720)
+  
+  ts_obj <- ts(vals, frequency = 24)
+  fit <- tryCatch(
+    forecast::ets(ts_obj, model = "AAA"),
+    error = function(e) tryCatch(
+      forecast::ets(ts_obj, model = "AAN"),
+      error = function(e2) tryCatch(
+        forecast::ets(ts_obj),
+        error = function(e3) NULL
+      )
+    )
+  )
+  if (is.null(fit))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
+  
+  fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
+  if (is.null(fc))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
+  
+  list(
+    predictions = as.numeric(fc$mean),
+    lower       = as.numeric(fc$lower[, 2]),
+    upper       = as.numeric(fc$upper[, 2]),
+    method      = "ETS (ساعتی)"
+  )
+}
+
+# ── پیش‌بینی ساعتی TBATS ──────────────────────────────────────────────────────
+forecast_hourly_tbats <- function(hourly_df, horizon_h = 24, target = "temperature") {
+  vals <- hourly_df[[target]]
+  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
+  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
+  if (length(vals) > 720) vals <- tail(vals, 720)
+  ts_obj <- ts(vals, frequency = 24)
+  
+  fit <- tryCatch(
+    forecast::tbats(ts_obj, use.parallel = FALSE, use.box.cox = FALSE),
+    error = function(e) tryCatch(
+      forecast::bats(ts_obj, use.parallel = FALSE, use.box.cox = FALSE),
+      error = function(e2) NULL
+    )
+  )
+  if (is.null(fit))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — TBATS"))
+  
+  fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
+  if (is.null(fc))
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — TBATS"))
+  
+  list(
+    predictions = as.numeric(fc$mean),
+    lower       = as.numeric(fc$lower[, 2]),
+    upper       = as.numeric(fc$upper[, 2]),
+    method      = if (inherits(fit, "tbats")) "TBATS (ساعتی)" else "BATS (ساعتی، TBATS fallback)"
+  )
+}
+
+# ════════════════════════════════════════════════════════════════════════════
+# بخش ۸: Dispatcher ساعتی
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── dispatcher: انتخاب مدل ساعتی ──────────────────────────────────────────────
+run_hourly_model <- function(model_name, hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   mn <- tolower(trimws(model_name))
-  message("[Dispatcher] درخواست مدل ساعتی: '", mn, "' | Multivariate: ", !is.null(exog_future))
+  message("[Dispatcher] درخواست مدل ساعتی: '", mn, "' | Multivariate: ", isTRUE(use_multivariate))
   
   if (nrow(hourly_df) < 48) stop("حداقل ۴۸ ردیف ساعتی برای آموزش نیاز است.")
   
@@ -1074,13 +1226,13 @@ run_hourly_model <- function(model_name, hourly_df, horizon_h = 24, target = "te
   result <- NULL
   
   if (mn == "xgboost") {
-    result <- forecast_hourly_xgboost(hourly_df, horizon_h, target, exog_future)
+    result <- forecast_hourly_xgboost(hourly_df, horizon_h, target, use_multivariate)
   } else if (mn == "lightgbm") {
-    result <- forecast_hourly_lightgbm(hourly_df, horizon_h, target, exog_future)
+    result <- forecast_hourly_lightgbm(hourly_df, horizon_h, target, use_multivariate)
   } else if (mn == "catboost") {
-    result <- forecast_hourly_catboost(hourly_df, horizon_h, target, exog_future)
+    result <- forecast_hourly_catboost(hourly_df, horizon_h, target, use_multivariate)
   } else if (mn == "rf") {
-    result <- forecast_hourly_rf(hourly_df, horizon_h, target, exog_future)
+    result <- forecast_hourly_rf(hourly_df, horizon_h, target, use_multivariate)
   } else if (mn == "arima") {
     result <- forecast_hourly_arima(hourly_df, horizon_h, target)
   } else if (mn == "sarima") {
@@ -1092,7 +1244,7 @@ run_hourly_model <- function(model_name, hourly_df, horizon_h = 24, target = "te
   } else if (mn == "prophet") {
     result <- forecast_hourly_prophet(hourly_df, horizon_h, target)
   } else if (mn == "svm") {
-    result <- forecast_hourly_svm(hourly_df, horizon_h, target)
+    result <- forecast_hourly_svm(hourly_df, horizon_h, target, use_multivariate)
   } else if (mn == "naive") {
     last_24 <- tail(vals_clean, 24)
     preds   <- rep(last_24, ceiling(horizon_h / 24))[seq_len(horizon_h)]
