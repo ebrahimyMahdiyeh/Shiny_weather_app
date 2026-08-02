@@ -1,4 +1,4 @@
-# 🌤️ WFS Dashboard — Iran Weather Forecast System
+#  WFS Dashboard — Iran Weather Forecast System
 
 <p align="center">
   <img src="https://img.shields.io/badge/R-4.3+-blue.svg" alt="R Version">
@@ -19,7 +19,7 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
 
 ---
 
-## 📸 Screenshots
+##  Screenshots
 
 <p align="center">
   <img src="images/overview.png" alt="Overview page" width="800"><br>
@@ -38,20 +38,19 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
   <sub>Report Export — configurable Excel/PDF exports</sub>
 </p>
 
-*Save your screenshots under these names in an `images/` folder in the repo (or edit the paths above to match your own).*
 
 ---
 
-## ✨ Features
+##  Features
 
-### 🏠 Overview
+###  Overview
 - Dataset stats at a glance: 5 stations, 10,040 daily records, 11 models
 - Historical temperature trend across all 5 stations in one chart, plus monthly averages per station
 - Per-station climate summary table (avg/min/max temperature, humidity, total precipitation, date coverage)
 - 5-step methodology pipeline, from data collection to evaluation
 - Model-family cheat sheet and climate variable distributions (violin plots)
 
-### 📈 Weather Forecast
+###  Weather Forecast
 - Pick a station, one or more models to compare, and a target variable — with an optional multivariate mode that feeds humidity/wind/pressure into ML models as covariates
 - Live conditions card: temperature, feels-like, pressure, wind, humidity, dew point, visibility, cloud cover, UV index, and a 24h trend sparkline
 - Hourly strip (past 24h + next 24h) with weather icons
@@ -59,26 +58,26 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
 - Rolling 24h backtest metrics (MAE, RMSE, R², runtime)
 - 7-day forecast cards, switchable by model
 
-### 🏆 Model Benchmark & Leaderboard
+###  Model Benchmark & Leaderboard
 - Configurable benchmark run: station, target variable, train/test split ratio
 - Leaderboard of all 11 models ranked by a composite score (plus R², MAE, RMSE)
 - Auto-recommended model with a 1–10 overall score and reasoning, plus "fastest" and "most accurate" alternatives
 - Metric comparison chart, speed-vs-accuracy trade-off scatter, rolling-window stability analysis, per-model speed benchmark, and a regional performance heatmap across all 5 stations
 
-### 🚨 Anomaly Detection
+###  Anomaly Detection
 Flags observations that deviate significantly from model expectations.
 
-### 📖 Model Guide
+###  Model Guide
 A quick reference explaining what each model family assumes and when to reach for it.
 
-### 📤 Report Export
+###  Report Export
 - Configure station, report title, analyst name, date range, and which sections to include (forecast, metrics, anomalies, ranking)
 - Export as a multi-sheet Excel workbook or an executive-summary PDF (charts + performance tables)
 - Live preview of report data before exporting
 
 ---
 
-## 📊 Example Benchmark Run
+##  Example Benchmark Run
 *Isfahan · temperature · 15% test split · 30.34s total runtime*
 
 | Rank | Model | Composite Score | R² | MAE | RMSE | Runtime |
@@ -98,7 +97,7 @@ Recommended model: **Random Forest** (overall score 9.9/10 — lowest error, hig
 
 ---
 
-## 🧮 Ensemble Formula
+##  Ensemble Formula
 The AutoML ensemble blends every model's forecast, weighted by inverse error, so more accurate models get proportionally more say in the final prediction:
 
 ```
@@ -107,7 +106,7 @@ The AutoML ensemble blends every model's forecast, weighted by inverse error, so
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Layer | Technology / Packages |
 | :--- | :--- |
@@ -121,7 +120,7 @@ The AutoML ensemble blends every model's forecast, weighted by inverse error, so
 
 ---
 
-## 🗄️ Data
+##  Data
 
 Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026), via [Open-Meteo](https://open-meteo.com/):
 
@@ -135,7 +134,7 @@ Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026
 
 ---
 
-## 🧪 Methodology
+##  Methodology
 
 1. **Data collection** — pull hourly/daily variables from the Open-Meteo API (temperature, humidity, wind, precipitation)
 2. **Preprocessing** — fill missing values, aggregate hourly → daily, normalize
@@ -145,7 +144,7 @@ Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 ```text
 .
@@ -166,7 +165,7 @@ Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026
 
 ---
 
-## 🚀 Installation & Setup
+##  Installation & Setup
 
 1. Install **R (≥ 4.3)** and **RStudio**.
 2. Install the required packages:
