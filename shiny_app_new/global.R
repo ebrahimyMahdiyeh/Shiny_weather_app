@@ -2,6 +2,53 @@
 # ── عملگر null-coalescing (باید قبل از همه چیز تعریف شود) ───────────────────
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0 && !is.na(a[1])) a else b
 
+# ── تضمین locale فارسی/UTF-8 (ضد خطای "input string 1 is invalid UTF-8") ──
+# نکته مهم: Sys.setlocale روی ویندوز وقتی locale نامعتبر باشد، Warning می‌دهد نه Error.
+# بنابراین tryCatch به تنهایی کافی نیست — باید warnings را هم بگیریم و نتیجه را بررسی کنیم.
+set_utf8_locale <- function() {
+  if (.Platform$OS.type == "windows") {
+    locs <- c("Persian_Iran.65001", "English_United States.65001",
+              "English_United States.1252", "C")
+  } else {
+    locs <- c("en_US.UTF-8", "C.UTF-8", "fa_IR.UTF-8", "C")
+  }
+  for (loc in locs) {
+    res <- tryCatch({
+      # suppressWarnings برای گرفتن warning های setlocale
+      suppressWarnings(Sys.setlocale("LC_ALL", loc))
+      TRUE
+    }, error = function(e) FALSE)
+    if (isTRUE(res)) {
+      cur <- tryCatch(Sys.getlocale("LC_CTYPE"), error = function(e) "")
+      if (grepl("65001|UTF-8|utf8|utf-8", cur, ignore.case = TRUE)) {
+        message("✓ Locale set to: ", loc, " (LC_CTYPE=", cur, ")")
+        return(TRUE)
+      }
+    }
+  }
+  message("⚠ Warning: could not set UTF-8 locale. Persian text may fail.")
+  message("  Current LC_CTYPE: ", tryCatch(Sys.getlocale("LC_CTYPE"), error = function(e) "unknown"))
+  FALSE
+}
+set_utf8_locale()
+
+# ── فعال‌سازی encoding پیش‌فرض UTF-8 برای همه عملیات رشته‌ای ────────────────
+options(encoding = "UTF-8")
+
+# ── Helper: اطمینان از UTF-8 بودن یک رشته ─────────────────────────────────
+# اگر رشته "unknown" یا "native" باشد، آن را به UTF-8 تبدیل می‌کند.
+ensure_utf8 <- function(x) {
+  if (is.character(x)) {
+    # اگر Encoding ناشناخته باشد، فرض می‌کنیم UTF-8 است (چون فایل UTF-8 ذخیره شده)
+    enc_vals <- Encoding(x)
+    needs_fix <- enc_vals %in% c("unknown")
+    if (any(needs_fix)) {
+      x[needs_fix] <- enc2utf8(x[needs_fix])
+    }
+  }
+  x
+}
+
 # ── مسیر مطلق پوشه داده — مستقل از working directory ──────────────────────────
 APP_DIR <- tryCatch({
   if (!is.null(getwd())) normalizePath(getwd(), mustWork = FALSE) else "."
@@ -65,6 +112,15 @@ STATIONS <- list(
   shiraz  = list(name = "شیراز",  lat = 29.5918, lon = 52.5837),
   tabriz  = list(name = "تبریز",  lat = 38.0962, lon = 46.2738)
 )
+
+# ── تضمین UTF-8 بودن نام ایستگاه‌ها (ضد خطای sub/gsub) ─────────────────────
+# روی برخی سیستم‌ها (مخصوصاً ویندوز با locale پیش‌فرض)، رشته‌های فارسی
+# ممکن است به‌صورت "unknown" encoding tag شوند که باعث خطای
+# "input string 1 is invalid UTF-8" در توابع sub/gsub می‌شود.
+for (.s in names(STATIONS)) {
+  Encoding(STATIONS[[.s]]$name) <- "UTF-8"
+}
+rm(.s)
 
 # ── Helper: پیدا کردن فایل‌های CSV شهرها (بدون استفاده از perl=TRUE) ─────────
 list_weather_csvs <- function(data_dir = DATA_DIR) {

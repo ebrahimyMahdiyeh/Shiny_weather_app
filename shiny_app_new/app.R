@@ -1,10 +1,38 @@
 # File: app.R — نسخه ۴ (Dark/Light mode + سایدبار راست)
 
+# ── اصلاح locale برای پشتیبانی فارسی (UTF-8) ────────────────────────────────
+# مشکل: روی ویندوز فرمت ".utf8" کار نمی‌کند — باید از کدپیج 65001 استفاده شود.
+# نکته مهم: روی ویندوز، setlocale با locale نامعتبر Warning می‌دهد نه Error.
+# بنابراین فقط tryCatch کافی نیست — باید warnings را هم بگیریم.
+tryCatch({
+  if (.Platform$OS.type == "windows") {
+    locs <- c("Persian_Iran.65001", "English_United States.65001",
+              "English_United States.1252", "C")
+  } else {
+    locs <- c("en_US.UTF-8", "C.UTF-8", "fa_IR.UTF-8", "C")
+  }
+  for (loc in locs) {
+    ok <- tryCatch({
+      suppressWarnings(Sys.setlocale("LC_ALL", loc))
+      TRUE
+    }, error = function(e) FALSE)
+    if (isTRUE(ok)) {
+      cur <- tryCatch(Sys.getlocale("LC_CTYPE"), error = function(e) "")
+      if (grepl("65001|UTF-8|utf8|utf-8", cur, ignore.case = TRUE)) {
+        message("✓ Locale set to: ", loc)
+        break
+      }
+    }
+  }
+}, error = function(e) {
+  message("Warning: could not set locale - ", e$message)
+})
+
+# ── فعال‌سازی encoding پیش‌فرض UTF-8 ─────────────────────────────────────────
+options(encoding = "UTF-8")
+
 # ── اطمینان از بارگذاری global.R ────────────────────────────────────────────
-# مشکل قبلی: فقط در صورت نبود WEATHER_DATA، global.R را source می‌کرد.
-# اما اگر session restart می‌شد یا workspace ناقص بود، کتابخانه‌ها لود نمی‌شدند.
-# راه‌حل: همیشه global.R را source کن (با "chdir = TRUE" تا مسیرها درست بمونن)
-source("global.R", chdir = TRUE, local = FALSE)
+source("global.R", chdir = TRUE, local = FALSE, encoding = "UTF-8")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CSS — متغیرهای تم (dark & light)
@@ -22,7 +50,7 @@ CUSTOM_CSS <- "
   --panel2:    #1e2d45;
   --border:    rgba(99,143,232,0.15);
   --border2:   rgba(99,143,232,0.28);
-  --text:      #e2e8f0;
+  --text:      #e2e8f0;+
   --text2:     #94a3b8;
   --text3:     #64748b;
   --blue:      #3b82f6;
@@ -288,7 +316,54 @@ select option  { background: var(--panel2) !important; color: var(--text) !impor
   background: linear-gradient(135deg,var(--green),#16a34a) !important;
   border: none !important; box-shadow: 0 3px 12px rgba(34,197,94,0.18) !important;
 }
-.btn-success:hover { transform: translateY(-1px); }
+.btn-success:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(34,197,94,0.32) !important; }
+.btn-danger {
+  background: linear-gradient(135deg,var(--red),#b91c1c) !important;
+  border: none !important; box-shadow: 0 3px 12px rgba(239,68,68,0.18) !important;
+}
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(239,68,68,0.32) !important; }
+.btn-danger:focus, .btn-success:focus { outline: none !important; }
+
+/* ══ کارت‌های دانلود گزارش (تب گزارش) ══ */
+.report-dl-card {
+  background: var(--panel2); border: 1px dashed var(--border2); border-radius: var(--radius);
+  padding: 28px 20px; text-align: center; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 10px;
+}
+.report-dl-card:hover { transform: translateY(-2px); border-color: var(--border2); box-shadow: 0 8px 20px rgba(0,0,0,0.22); }
+body.light-mode .report-dl-card:hover { box-shadow: 0 8px 20px rgba(30,41,59,0.10); }
+.report-dl-card .dl-icon { font-size: 2.6em; }
+.report-dl-card .dl-title { font-size: 14px; font-weight: 800; color: var(--text); margin: 2px 0 0; }
+.report-dl-card .dl-desc { font-size: 11.5px; color: var(--text3); line-height: 1.6; margin: 0; }
+.report-dl-card .shiny-download-link { margin-top: 4px; }
+
+/* ══ بخش «محتوای گزارش» (تب گزارش) ══ */
+.rc-sec-title { font-size: 11px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; margin: 2px 0 9px; display: flex; align-items: center; }
+.rc-chip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.rc-chip-grid .shiny-input-checkbox:not(.shiny-input-container) { display: flex; }
+.rc-chip-grid .form-group, .rc-chip-grid .shiny-input-checkbox { margin: 0 !important; display: flex !important; align-items: center; }
+.rc-chip-grid .checkbox { margin: 0 !important; width: 100%; }
+.rc-chip-grid .checkbox label {
+  display: flex !important; align-items: center; gap: 7px;
+  width: 100%; margin: 0 !important; padding: 9px 11px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 11.5px; font-weight: 700; color: var(--text2); cursor: pointer;
+  transition: all .16s ease; min-height: 38px; box-sizing: border-box;
+}
+.rc-chip-grid .checkbox label:hover { border-color: var(--border2); color: var(--text); background: var(--hover-bg); }
+.rc-chip-grid .checkbox label:has(input:checked) { border-color: var(--blue); background: rgba(59,130,246,0.10); color: var(--text); box-shadow: 0 0 0 1px rgba(59,130,246,0.25); }
+.rc-chip-grid input[type='checkbox'] {
+  appearance: none !important; -webkit-appearance: none !important;
+  width: 17px !important; height: 17px !important; border-radius: 5px !important;
+  border: 1.5px solid var(--border2) !important; background: transparent !important;
+  margin: 0 !important; position: relative !important; flex-shrink: 0 !important; cursor: pointer;
+  transition: all .16s ease;
+}
+.rc-chip-grid input[type='checkbox']:checked { background: var(--blue) !important; border-color: var(--blue) !important; }
+.rc-chip-grid input[type='checkbox']:checked::after {
+  content: '\2713'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: #fff; font-size: 11px; font-weight: 900; line-height: 1;
+}
 .btn-default {
   background: var(--input-bg) !important;
   border: 1px solid var(--border) !important; color: var(--text2) !important;
@@ -822,11 +897,11 @@ ui <- shinydashboard::dashboardPage(
                                                        tags$span(style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#60a5fa;border-radius:20px;padding:4px 11px;font-size:10px;font-weight:700;margin-bottom:10px;",
                                                                  tags$i(class="fa fa-book"), "راهنمای جامع"),
                                                        tags$h2("مدل‌های پیش‌بینی و ", tags$span(class="grad","معیارهای ارزیابی")),
-                                                       tags$p("توضیح کامل ۸ مدل پیش‌بینی، کاربردها، نقاط قوت و ضعف، و فرمول‌های ریاضی — به‌همراه مقایسه سریع و سهم هر معیار در امتیاز نهایی."),
+                                                       tags$p("توضیح کامل ۱۱ مدل پیش‌بینی، کاربردها، نقاط قوت و ضعف، و فرمول‌های ریاضی — به‌همراه مقایسه سریع و سهم هر معیار در امتیاز نهایی."),
                                                        tags$div(class="hero-chips",
-                                                                tags$span(class="hchip hchip-blue",   tags$i(class="fa fa-layer-group"),    "۸ مدل پیش‌بینی"),
-                                                                tags$span(class="hchip hchip-amber",  tags$i(class="fa fa-shapes"),         "۴ دسته الگوریتمی"),
-                                                                tags$span(class="hchip hchip-teal",   tags$i(class="fa fa-ruler-combined"), "۴ معیار ارزیابی"),
+                                                                tags$span(class="hchip hchip-blue",   tags$i(class="fa fa-layer-group"),    "۱۱ مدل پیش‌بینی"),
+                                                                tags$span(class="hchip hchip-amber",  tags$i(class="fa fa-shapes"),         "۳ دسته الگوریتمی"),
+                                                                tags$span(class="hchip hchip-teal",   tags$i(class="fa fa-ruler-combined"), "۵ معیار ارزیابی"),
                                                                 tags$span(class="hchip hchip-purple", tags$i(class="fa fa-trophy"),         "۱ امتیاز ترکیبی")
                                                        )
                                               )
@@ -845,16 +920,18 @@ ui <- shinydashboard::dashboardPage(
                                                                       tags$th("مدل"), tags$th("دسته"), tags$th("دقت"), tags$th("سرعت"), tags$th("تفسیرپذیری")
                                                                     )),
                                                                     tags$tbody(
-                                                                      mg_compare_row("ARIMA",           "کلاسیک آماری (دستی)",  "blue",   3, 4, 5),
-                                                                      mg_compare_row("SARIMA",          "کلاسیک آماری",         "blue",   3, 2, 4),
-                                                                      mg_compare_row("ETS / TBATS",     "کلاسیک آماری (دستی)",  "blue",   3, 4, 4),
-                                                                      mg_compare_row("XGBoost",         "یادگیری ماشین",        "amber",  5, 4, 2),
-                                                                      mg_compare_row("LightGBM",        "یادگیری ماشین",        "amber",  5, 5, 2),
-                                                                      mg_compare_row("CatBoost",        "یادگیری ماشین",        "amber",  5, 3, 2),
-                                                                      mg_compare_row("Random Forest",   "یادگیری ماشین",        "amber",  4, 3, 3),
-                                                                      mg_compare_row("SVM",             "یادگیری ماشین",        "amber",  3, 2, 2),
-                                                                      mg_compare_row("Prophet",         "مدرن (دستی)",          "purple", 4, 3, 4),
-                                                                      mg_compare_row("AutoML Ensemble", "ترکیبی",               "green",  5, 2, 2)
+                                                                      mg_compare_row("ARIMA",           "کلاسیک آماری (دستی)",   "blue",   3, 4, 5),
+                                                                      mg_compare_row("SARIMA",          "کلاسیک آماری (خودکار)", "blue",   4, 2, 4),
+                                                                      mg_compare_row("ETS",             "کلاسیک آماری (دستی)",   "blue",   3, 5, 4),
+                                                                      mg_compare_row("TBATS",           "کلاسیک آماری (دستی)",   "blue",   4, 2, 3),
+                                                                      mg_compare_row("Random Forest",   "یادگیری ماشین",         "amber",  4, 3, 3),
+                                                                      mg_compare_row("XGBoost",         "یادگیری ماشین",         "amber",  5, 4, 2),
+                                                                      mg_compare_row("LightGBM",        "یادگیری ماشین",         "amber",  5, 5, 2),
+                                                                      mg_compare_row("CatBoost",        "یادگیری ماشین",         "amber",  5, 3, 2),
+                                                                      mg_compare_row("SVM",             "یادگیری ماشین",         "amber",  3, 2, 2),
+                                                                      mg_compare_row("Prophet",         "مدرن (دستی)",           "purple", 4, 3, 4),
+                                                                      mg_compare_row("Naïve",           "بیس‌لاین (خودکار)",     "green",  1, 5, 5),
+                                                                      mg_compare_row("AutoML Ensemble", "ترکیبی",                "green",  5, 2, 2)
                                                                     )
                                                          )
                                                 )
@@ -870,27 +947,35 @@ ui <- shinydashboard::dashboardPage(
                                                                 title=tagList(icon("chart-bar"), "کلاسیک آماری"),
                                                                 mg_model_card(
                                                                   icon="wave-square", color="blue", title="ARIMA",
-                                                                  badges=list(list("کلاسیک","badge-classic")),
-                                                                  desc="AutoRegressive Integrated Moving Average",
+                                                                  badges=list(list("دستی","badge-classic")),
+                                                                  desc="AutoRegressive Integrated Moving Average — مدل‌سازی خودرگرسیون با میانگین متحرک",
                                                                   formula_tex=r"(y_t = \varphi_1 y_{t-1} + \cdots + \varphi_p y_{t-p} + \varepsilon_t + \theta_1 \varepsilon_{t-1} + \cdots + \theta_q \varepsilon_{t-q})",
                                                                   pros=c("تفسیرپذیر","مبنای آماری محکم"),
                                                                   cons=c("فرض خطی بودن","ضعیف در فصلی‌بودن شدید")
                                                                 ),
                                                                 mg_model_card(
                                                                   icon="arrows-rotate", color="blue", title="SARIMA",
-                                                                  badges=list(list("فصلی","badge-classic")),
-                                                                  desc="ARIMA به‌همراه پارامترهای فصلی (P, D, Q, s)",
+                                                                  badges=list(list("خودکار","badge-classic")),
+                                                                  desc="ARIMA به‌همراه پارامترهای فصلی (P, D, Q, s) — تنظیم خودکار با auto.arima",
                                                                   formula_tex=r"(\text{SARIMA}(p,d,q)(P,D,Q)[s])",
-                                                                  pros=c("مدل‌سازی فصلی دقیق","تنظیم خودکار با auto.arima"),
+                                                                  pros=c("مدل‌سازی فصلی دقیق","تنظیم خودکار"),
                                                                   cons=c("محاسبه نسبتاً سنگین")
                                                                 ),
                                                                 mg_model_card(
-                                                                  icon="chart-area", color="blue", title="ETS / TBATS",
-                                                                  badges=list(list("Smoothing","badge-classic")),
-                                                                  desc="Exponential Smoothing با روند و فصلیت چندگانه",
+                                                                  icon="chart-area", color="blue", title="ETS",
+                                                                  badges=list(list("دستی","badge-classic"), list("Smoothing","badge-classic")),
+                                                                  desc="Exponential Smoothing — مدل‌سازی سطح، روند و فصلیت با ترکیب‌های Additive/Multiplicative",
                                                                   formula_tex=r"(\hat{y}_{t+h} = (l_t + h\,b_t)\times s_{t+h-m})",
-                                                                  pros=c("سریع و خودکار","پشتیبانی از چند فصلیت هم‌زمان"),
+                                                                  pros=c("سریع و خودکار","پشتیبانی از روند و فصلیت"),
                                                                   cons=c("فرض ساختار نسبتاً ثابت")
+                                                                ),
+                                                                mg_model_card(
+                                                                  icon="chart-line", color="blue", title="TBATS",
+                                                                  badges=list(list("دستی","badge-classic"), list("Multi-season","badge-classic")),
+                                                                  desc="Trigonometric Exponential Smoothing با Box-Cox Transform — مدل‌سازی فصلیت‌های چندگانه و غیرصحیح",
+                                                                  formula_tex=r"(y_t^{(\omega)} = \ell_t + \sum_{k=1}^{K} b_k\,\sin(2\pi f_k t + \phi_k) + \varepsilon_t)",
+                                                                  pros=c("پشتیبانی از چند فصلیت هم‌زمان","مناسب دوره‌های نامنظم"),
+                                                                  cons=c("محاسبه سنگین‌تر از ETS")
                                                                 )
                                                               ),
                                                               
@@ -912,8 +997,24 @@ ui <- shinydashboard::dashboardPage(
                                                                   cons=c("کُند روی داده‌های بزرگ")
                                                                 ),
                                                                 mg_model_card(
+                                                                  icon="feather", color="amber", title="LightGBM",
+                                                                  badges=list(list("Gradient Boost","badge-ml"), list("Leaf-wise","badge-ml")),
+                                                                  desc="Light Gradient Boosting Machine — رشد برگ‌به‌برگ با هیستوگرام برای آموزش سریع‌تر",
+                                                                  formula_tex=r"(F_m(x) = F_{m-1}(x) + \eta \sum_{j \in \text{leaf}} w_j\,\mathbb{I}(x \in \text{leaf}_j))",
+                                                                  pros=c("آموزش بسیار سریع","مصرف حافظه کم","مناسب داده‌های بزرگ"),
+                                                                  cons=c("ریسک overfitting روی داده کوچک","تنظیم num_leaves حساس")
+                                                                ),
+                                                                mg_model_card(
+                                                                  icon="cat", color="amber", title="CatBoost",
+                                                                  badges=list(list("Gradient Boost","badge-ml"), list("Ordered Boost","badge-ml")),
+                                                                  desc="Categorical Boosting — مدیریت خودکار ویژگی‌های دسته‌ای با Ordered Boosting برای جلوگیری از data leakage",
+                                                                  formula_tex=r"(F_m(x) = F_{m-1}(x) + \eta \cdot h_m(x;\,D^{\text{ordered}}))",
+                                                                  pros=c("مدیریت خودکار متغیرهای دسته‌ای","مقاوم در برابر overfitting","تنظیم hyperparameter ساده"),
+                                                                  cons=c("آموزش کندتر از LightGBM","نیاز به رم بیشتر")
+                                                                ),
+                                                                mg_model_card(
                                                                   icon="vector-square", color="amber", title="SVM",
-                                                                  badges=list(list("ML","badge-ml")),
+                                                                  badges=list(list("Kernel","badge-ml")),
                                                                   desc="رگرسیون بردار پشتیبان با kernel RBF",
                                                                   pros=c("مؤثر در فضای با ابعاد بالا"),
                                                                   cons=c("کُند روی داده حجیم","نیاز به نرمال‌سازی")
@@ -924,16 +1025,24 @@ ui <- shinydashboard::dashboardPage(
                                                                 title=tagList(icon("leaf"), "مدرن و ترکیبی"),
                                                                 mg_model_card(
                                                                   icon="leaf", color="purple", title="Prophet",
-                                                                  badges=list(list("Bayesian","badge-modern"), list("Changepoint","badge-modern")),
-                                                                  desc="مدل Bayesian از Meta با مدیریت تعطیلات و changepoint",
+                                                                  badges=list(list("دستی","badge-modern"), list("Bayesian","badge-modern")),
+                                                                  desc="مدل Bayesian از Meta با مدیریت تعطیلات و changepoint — تجزیه به روند، فصلیت و تعطیلات",
                                                                   formula_tex=r"(y(t) = g(t) + s(t) + h(t) + \varepsilon_t)",
-                                                                  pros=c("مدیریت missing data","robust","تفسیرپذیر"),
+                                                                  pros=c("مدیریت missing data","تفسیرپذیر","مدیریت تعطیلات"),
                                                                   cons=c("نیاز به کالیبراسیون")
+                                                                ),
+                                                                mg_model_card(
+                                                                  icon="flag", color="purple", title="Naïve",
+                                                                  badges=list(list("بیس‌لاین","badge-modern"), list("خودکار","badge-modern")),
+                                                                  desc="خط‌مبنا (Baseline) — مقدار آخرین مشاهده به‌عنوان پیش‌بینی آینده؛ مرجع سنجش عملکرد سایر مدل‌ها",
+                                                                  formula_tex=r"(\hat{y}_{t+h} = y_t)",
+                                                                  pros=c("بسیار سریع","بدون فرض","خط‌مبنا برای مقایسه"),
+                                                                  cons=c("بدون یادگیری الگو","ضعیف در داده با روند/فصلیت")
                                                                 ),
                                                                 mg_model_card(
                                                                   icon="layer-group", color="green", title="AutoML Ensemble",
                                                                   badges=list(list("Weighted","badge-ens")),
-                                                                  desc="میانگین وزنی خروجی چند مدل، با وزن معکوسِ خطای هرکدام",
+                                                                  desc="میانگین وزنی خروجی چند مدل، با وزن معکوسِ خطای هرکدام — انتخاب خودکار بهترین مدل پایه",
                                                                   formula_tex=r"(\hat{y} = \sum_i w_i \hat{y}_i \qquad w_i = \dfrac{1/\text{score}_i}{\sum_j 1/\text{score}_j})",
                                                                   pros=c("بهترین عملکرد کلی","مقاوم در برابر ضعف تک‌مدلی")
                                                                 )
@@ -949,36 +1058,41 @@ ui <- shinydashboard::dashboardPage(
                                          mg_metric_card(
                                            icon="ruler", hex="#60a5fa", title="RMSE",
                                            formula_tex=r"(\text{RMSE} = \sqrt{\dfrac{\sum (y-\hat y)^2}{n}})",
-                                           desc="حساس به خطاهای بزرگ", weight=0.25
+                                           desc="جذر میانگین مربعات خطا — حساس به خطاهای بزرگ", weight=0.25
                                          ),
                                          mg_metric_card(
                                            icon="scale-balanced", hex="#2dd4bf", title="MAE",
                                            formula_tex=r"(\text{MAE} = \dfrac{\sum |y-\hat y|}{n})",
-                                           desc="مقاوم در برابر outlier", weight=0.20
+                                           desc="میانگین قدر مطلق خطا — مقاوم در برابر outlier", weight=0.20
                                          ),
                                          mg_metric_card(
-                                           icon="percent", hex="#fbbf24", title="MAPE / SMAPE",
-                                           formula_tex=r"(\text{MAPE} = \dfrac{\sum |y-\hat y|}{\sum |y|}\times 100)",
-                                           desc="درصد خطای نسبی", weight=0.35,
-                                           note="۲۰٪ سهم MAPE + ۱۵٪ سهم SMAPE از امتیاز نهایی"
+                                           icon="percent", hex="#fbbf24", title="MAPE",
+                                           formula_tex=r"(\text{MAPE} = \dfrac{1}{n}\sum \dfrac{|y-\hat y|}{|y|}\times 100)",
+                                           desc="میانگین درصد قدر مطلق خطا — درصد خطای نسبی", weight=0.20
+                                         ),
+                                         mg_metric_card(
+                                           icon="shuffle", hex="#34d399", title="SMAPE",
+                                           formula_tex=r"(\text{SMAPE} = \dfrac{1}{n}\sum \dfrac{|y-\hat y|}{(|y|+|\hat y|)/2}\times 100)",
+                                           desc="درصد خطای متقارن — پایدارتر از MAPE وقتی y نزدیک صفر است", weight=0.15
                                          ),
                                          mg_metric_card(
                                            icon="superscript", hex="#a78bfa", title="R²",
                                            formula_tex=r"(R^2 = 1 - \dfrac{\sum (y-\hat y)^2}{\sum (y-\bar y)^2})",
-                                           desc="بالاتر = بهتر (۰ تا ۱)", weight=0.20
+                                           desc="ضریب تعیین — بالاتر = بهتر (۰ تا ۱)", weight=0.20
                                          ),
-                                         
+
                                          tags$div(class="composite-panel",
                                                   tags$div(class="cp-title", tags$i(class="fa fa-trophy"), "نمره ترکیبی"),
                                                   tags$div(class="stack-bar",
                                                            tags$div(style="flex:25;background:#60a5fa;"),
                                                            tags$div(style="flex:20;background:#2dd4bf;"),
-                                                           tags$div(style="flex:35;background:#fbbf24;"),
+                                                           tags$div(style="flex:20;background:#fbbf24;"),
+                                                           tags$div(style="flex:15;background:#34d399;"),
                                                            tags$div(style="flex:20;background:#a78bfa;")
                                                   ),
                                                   tags$div(class="formula-box", style="margin:0 0 2px;",
                                                            tags$div(class="formula-scroll tex-formula",
-                                                                    `data-tex`=r"(\text{Score}=0.25\,n_{RMSE}+0.20\,n_{MAE}+0.20\,n_{MAPE}+0.20\,n_{R^2}+0.15\,n_{SMAPE})")),
+                                                                    `data-tex`=r"(\text{Score}=0.25\,n_{RMSE}+0.20\,n_{MAE}+0.20\,n_{MAPE}+0.15\,n_{SMAPE}+0.20\,n_{R^2})")),
                                                   tags$div(class="cp-note", "نرمال‌سازی min-max روی همه مدل‌ها · عدد کمتر = عملکرد بهتر")
                                          )
                                        )
@@ -1006,5 +1120,23 @@ server <- function(input, output, session) {
                anomaly_rv      = anomaly_rv,
                leaderboard_rv  = leaderboard_rv)
 }
-install.packages("catboost")
-shinyApp(ui, server)
+
+# (حذف شد) install.packages("catboost") — این پکیج روی CRAN نیست و باعث
+# اخطار می‌شد. اگر catboost نیاز دارید، از GitHub نصب کنید:
+#   remotes::install_github("catboost/catboost", subdir = "catboost/R-package")
+
+# ── اجرای اپ در مرورگر خارجی (به جای Viewer داخلی RStudio) ─────────────────
+# مشکل: Viewer داخلی RStudio روی ویندوز با کاراکترهای فارسی مشکل دارد.
+# راه‌حل: اپ را در مرورگر پیش‌فرض سیستم باز می‌کنیم که UTF-8 را کامل پشتیبانی می‌کند.
+app_obj <- shinyApp(ui, server)
+
+# اگر اپ مستقیماً (نه به عنوان module) اجرا می‌شود، آن را در مرورگر باز کن
+if (identical(environment(), globalenv()) &&
+    !exists("shiny_test_mode", envir = globalenv())) {
+  options(shiny.launch.browser = TRUE)  # مرورگر خارجی
+  options(shiny.host = "127.0.0.1")
+  options(shiny.port = 3838)  # پورت ثابت
+  runApp(app_obj)
+} else {
+  app_obj
+}
