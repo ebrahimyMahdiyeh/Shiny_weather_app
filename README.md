@@ -31,11 +31,15 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
 </p>
 <p align="center">
   <img src="images/leaderboard.png" alt="Model benchmark leaderboard" width="800"><br>
-  <sub>Model Benchmark — leaderboard, trade-off analysis, regional heatmap</sub>
+  <sub>Model leaderboard</sub>
 </p>
 <p align="center">
-  <img src="images/anomaly.png" alt="Report export page" width="800"><br>
-  <sub>Report Export — configurable Excel/PDF exports</sub>
+  <img src="images/heatmap.png" alt="Model heatmap" width="800"><br>
+  <sub>Model heatmap for each region</sub>
+</p>
+<p align="center">
+  <img src="images/anomaly.png" alt="model anomaly" width="800"><br>
+  <sub>Model anomaly analysis</sub>
 </p>
 
 
