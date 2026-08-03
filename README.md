@@ -30,11 +30,11 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
   <sub>Weather Forecast — live conditions, hourly chart, 7-day outlook</sub>
 </p>
 <p align="center">
-  <img src="images/benchmark.png" alt="Model benchmark leaderboard" width="800"><br>
+  <img src="images/leaderboard.png" alt="Model benchmark leaderboard" width="800"><br>
   <sub>Model Benchmark — leaderboard, trade-off analysis, regional heatmap</sub>
 </p>
 <p align="center">
-  <img src="images/report-export.png" alt="Report export page" width="800"><br>
+  <img src="images/anomaly.png" alt="Report export page" width="800"><br>
   <sub>Report Export — configurable Excel/PDF exports</sub>
 </p>
 
