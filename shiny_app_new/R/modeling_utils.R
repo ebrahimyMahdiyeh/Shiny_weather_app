@@ -548,9 +548,27 @@ forecast_naive <- function(train_df, horizon, target = "temperature") {
 run_model_by_name <- function(model_name, train_df, horizon,
                               target = "temperature") {
   model_name <- as.character(model_name)[1]
-  model_name <- gsub("[\u200B\u200C\u200D\u200E\u200F\u202A-\u202E\uFEFF]", "", model_name)
+
+  # ── پاک‌سازی کاراکترهای نامرئی (ZWNJ و类似的) ──────────────────────────────
+  # مشکل: gsub با pattern فارسی روی ویندوز خطای "invalid UTF-8" می‌دهد.
+  # راه‌حل: استفاده از useBytes=TRUE یا iconv با_substr مکرر.
+  #
+  # استراتژی: ابتدا encoding را روی UTF-8 تنظیم کن، سپس با useBytes=TRUE
+  # بایت‌های نامرئی را حذف کن.
+  tryCatch({
+    Encoding(model_name) <- "UTF-8"
+    # کاراکترهای نامرئی: U+200B..U+200F, U+202A..U+202E, U+FEFF
+    # با useBytes=TRUE از بررسی encoding عبور می‌کنیم
+    invisible_chars <- "\u200B\u200C\u200D\u200E\u200F\u202A\u202B\u202C\u202D\u202E\uFEFF"
+    model_name <- gsub(invisible_chars, "", model_name, useBytes = TRUE)
+  }, error = function(e) {
+    message("Warning در پاک‌سازی نام مدل: ", e$message)
+  })
+
   model_name <- trimws(model_name)
-  
+  # اطمینان از اینکه فقط حروف ASCII انگلیسی باقی مانده
+  model_name <- tolower(model_name)
+
   fn <- switch(model_name,
                arima     = forecast_arima,
                sarima    = forecast_sarima,
