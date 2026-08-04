@@ -22,27 +22,9 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
 ##  Screenshots
 
 <p align="center">
-  <img src="images/overview.png" alt="Overview page" width="800"><br>
-  <sub>Overview — dataset stats, historical trends, and methodology</sub>
+  <img src="images/overview.gif" alt="Overview page" width="800"><br>
+  <sub>Overview of dashboard</sub>
 </p>
-<p align="center">
-  <img src="images/forecast.png" alt="Weather forecast page" width="800"><br>
-  <sub>Weather Forecast — live conditions, hourly chart, 7-day outlook</sub>
-</p>
-<p align="center">
-  <img src="images/leaderboard.png" alt="Model benchmark leaderboard" width="800"><br>
-  <sub>Model leaderboard</sub>
-</p>
-<p align="center">
-  <img src="images/heatmap.png" alt="Model heatmap" width="800"><br>
-  <sub>Model heatmap for each region</sub>
-</p>
-<p align="center">
-  <img src="images/anomaly.png" alt="model anomaly" width="800"><br>
-  <sub>Model anomaly analysis</sub>
-</p>
-
-
 ---
 
 ##  Features
