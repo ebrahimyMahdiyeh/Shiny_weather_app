@@ -7,122 +7,125 @@ reportUI <- function(id) {
   tagList(
     fluidRow(
       column(4,
-        box(
-          title       = "تنظیمات گزارش",
-          width       = 12,
-          status      = "info",
-          solidHeader = TRUE,
-          selectInput(ns("report_station"),
-            label   = "ایستگاه:",
-            choices = NULL
-          ),
-          textInput(ns("report_title"),
-            label = "عنوان گزارش:",
-            value = "گزارش تحلیل آب‌وهوا"
-          ),
-          textInput(ns("analyst_name"),
-            label = "نام تحلیلگر:",
-            value = "سیستم خودکار"
-          ),
-          dateRangeInput(ns("report_date_range"),
-            label     = "بازه زمانی:",
-            start     = Sys.Date() - 365,
-            end       = Sys.Date() - 1,
-            language  = "fa"
-          ),
-          hr(),
-          # چک‌باکس‌های محتوا — چیدمان کارت‌مانند
-          tags$div(class="rc-sec-title",
-                   tags$i(class="fa fa-list-check", style="margin-left:6px;color:var(--blue2);"),
-                   "محتوای گزارش"),
-          tags$div(class="rc-chip-grid",
-            checkboxInput(ns("include_forecast"),
-              label = tagList(tags$i(class="fa fa-cloud-sun", style="margin-left:5px;color:#60a5fa;"), "پیش‌بینی"),
-              value = TRUE, width = "100%"
-            ),
-            checkboxInput(ns("include_metrics"),
-              label = tagList(tags$i(class="fa fa-ruler-combined", style="margin-left:5px;color:#2dd4bf;"), "معیارهای ارزیابی"),
-              value = TRUE, width = "100%"
-            ),
-            checkboxInput(ns("include_anomalies"),
-              label = tagList(tags$i(class="fa fa-triangle-exclamation", style="margin-left:5px;color:#fbbf24;"), "ناهنجاری‌ها"),
-              value = TRUE, width = "100%"
-            ),
-            checkboxInput(ns("include_leaderboard"),
-              label = tagList(tags$i(class="fa fa-trophy", style="margin-left:5px;color:#a78bfa;"), "رتبه‌بندی مدل‌ها"),
-              value = TRUE, width = "100%"
-            )
-          )
-        )
+             box(
+               title       = "تنظیمات گزارش",
+               width       = 12,
+               status      = "info",
+               solidHeader = TRUE,
+               selectInput(ns("report_station"),
+                           label   = "ایستگاه:",
+                           choices = NULL
+               ),
+               textInput(ns("report_title"),
+                         label = "عنوان گزارش:",
+                         value = "گزارش تحلیل آب‌وهوا"
+               ),
+               textInput(ns("analyst_name"),
+                         label = "نام تحلیلگر:",
+                         value = "سیستم خودکار"
+               ),
+               dateRangeInput(ns("report_date_range"),
+                              label     = "بازه زمانی:",
+                              start     = Sys.Date() - 365,
+                              end       = Sys.Date() - 1,
+                              language  = "fa"
+               ),
+               hr(),
+               
+               tags$h5(tags$i(class="fa fa-list-check", style="margin-left:6px;color:#60a5fa;"), "محتوای گزارش"),
+               
+               fluidRow(
+                 column(6,
+                        tags$div(class="mv-box compare-box",
+                                 checkboxInput(ns("include_forecast"), label = "پیش‌بینی", value = TRUE, width = "100%")
+                        )
+                 ),
+                 column(6,
+                        tags$div(class="mv-box compare-box",
+                                 checkboxInput(ns("include_metrics"), label = "معیارهای ارزیابی", value = TRUE, width = "100%")
+                        )
+                 ),
+                 column(6,
+                        tags$div(class="mv-box compare-box",
+                                 checkboxInput(ns("include_anomalies"), label = "ناهنجاری‌ها", value = TRUE, width = "100%")
+                        )
+                 ),
+                 column(6,
+                        tags$div(class="mv-box compare-box",
+                                 checkboxInput(ns("include_leaderboard"), label = "رتبه‌بندی مدل‌ها", value = TRUE, width = "100%")
+                        )
+                 )
+               )
+               )
       ),
-
+      
       column(8,
-        # پیش‌نمایش و دانلود
-        box(
-          title       = "دانلود گزارش",
-          width       = 12,
-          status      = "primary",
-          solidHeader = TRUE,
-          tags$p(style="font-size:11.5px;color:var(--text3);margin:-4px 0 12px;",
-                 "سه قالب خروجی: Excel برای تحلیل داده‌محور، PDF برای گزارش رسمی (نیازمند LaTeX)، و HTML برای اشتراک‌گذاری سریع بدون نیاز به نصب."),
-          fluidRow(
-            column(4,
-              div(
-                class = "report-dl-card",
-                icon("file-excel", class = "dl-icon", style = "color:#1D6F42;"),
-                tags$div(class = "dl-title", "گزارش Excel"),
-                tags$p(class = "dl-desc",
-                  "صفحات: خلاصه، داده تاریخی، پیش‌بینی، ناهنجاری‌ها، رتبه‌بندی"
-                ),
-                downloadButton(
-                  ns("download_excel"),
-                  label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "Excel"),
-                  class = "btn-success"
-                )
-              )
-            ),
-            column(4,
-              div(
-                class = "report-dl-card",
-                icon("file-pdf", class = "dl-icon", style = "color:#dc3545;"),
-                tags$div(class = "dl-title", "گزارش PDF"),
-                tags$p(class = "dl-desc",
-                  "خلاصه اجرایی + آمار توصیفی + جداول عملکرد"
-                ),
-                downloadButton(
-                  ns("download_pdf"),
-                  label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "PDF"),
-                  class = "btn-danger"
-                )
-              )
-            ),
-            column(4,
-              div(
-                class = "report-dl-card",
-                icon("file-code", class = "dl-icon", style = "color:#3b82f6;"),
-                tags$div(class = "dl-title", "گزارش HTML"),
-                tags$p(class = "dl-desc",
-                  "خودکار و همیشه قابل‌اعتماد — بدون نیاز به LaTeX"
-                ),
-                downloadButton(
-                  ns("download_html"),
-                  label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "HTML"),
-                  class = "btn-primary"
-                )
-              )
-            )
-          )
-        ),
-
-        # پیش‌نمایش آمار برای گزارش
-        box(
-          title       = "پیش‌نمایش داده گزارش",
-          width       = 12,
-          status      = "info",
-          solidHeader = TRUE,
-          collapsible = TRUE,
-          uiOutput(ns("report_preview"))
-        )
+             # پیش‌نمایش و دانلود
+             box(
+               title       = "دانلود گزارش",
+               width       = 12,
+               status      = "primary",
+               solidHeader = TRUE,
+               tags$p(style="font-size:11.5px;color:var(--text3);margin:-4px 0 12px;",
+                      "سه قالب خروجی: Excel برای تحلیل داده‌محور، PDF برای گزارش رسمی (نیازمند LaTeX)، و HTML برای اشتراک‌گذاری سریع بدون نیاز به نصب."),
+               fluidRow(
+                 column(4,
+                        div(
+                          class = "report-dl-card",
+                          icon("file-excel", class = "dl-icon", style = "color:#1D6F42;"),
+                          tags$div(class = "dl-title", "گزارش Excel"),
+                          tags$p(class = "dl-desc",
+                                 "صفحات: خلاصه، داده تاریخی، پیش‌بینی، ناهنجاری‌ها، رتبه‌بندی"
+                          ),
+                          downloadButton(
+                            ns("download_excel"),
+                            label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "Excel"),
+                            class = "btn-success"
+                          )
+                        )
+                 ),
+                 column(4,
+                        div(
+                          class = "report-dl-card",
+                          icon("file-pdf", class = "dl-icon", style = "color:#dc3545;"),
+                          tags$div(class = "dl-title", "گزارش PDF"),
+                          tags$p(class = "dl-desc",
+                                 "خلاصه اجرایی + آمار توصیفی + جداول عملکرد"
+                          ),
+                          downloadButton(
+                            ns("download_pdf"),
+                            label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "PDF"),
+                            class = "btn-danger"
+                          )
+                        )
+                 ),
+                 column(4,
+                        div(
+                          class = "report-dl-card",
+                          icon("file-code", class = "dl-icon", style = "color:#3b82f6;"),
+                          tags$div(class = "dl-title", "گزارش HTML"),
+                          tags$p(class = "dl-desc",
+                                 "خودکار و همیشه قابل‌اعتماد — بدون نیاز به LaTeX"
+                          ),
+                          downloadButton(
+                            ns("download_html"),
+                            label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "HTML"),
+                            class = "btn-primary"
+                          )
+                        )
+                 )
+               )
+             ),
+             
+             # پیش‌نمایش آمار برای گزارش
+             box(
+               title       = "پیش‌نمایش داده گزارش",
+               width       = 12,
+               status      = "info",
+               solidHeader = TRUE,
+               collapsible = TRUE,
+               uiOutput(ns("report_preview"))
+             )
       )
     )
   )
@@ -130,10 +133,10 @@ reportUI <- function(id) {
 
 # ── Server ───────────────────────────────────────────────────────────────────
 reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
-                          leaderboard_rv) {
+                         leaderboard_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
+    
     # تنظیم ایستگاه‌ها
     observe({
       req(weather_data())
@@ -143,21 +146,21 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
         }))
       updateSelectInput(session, "report_station", choices = choices)
     })
-
+    
     # ── آماده‌سازی داده گزارش ────────────────────────────────────────────────
     report_data <- reactive({
       req(input$report_station, weather_data())
       sid <- input$report_station
       req(sid %in% names(weather_data()))
       df <- weather_data()[[sid]]
-
+      
       # فیلتر بازه زمانی
       date_range <- input$report_date_range
       if (!is.null(date_range)) {
         df <- df %>%
           dplyr::filter(date >= date_range[1] & date <= date_range[2])
       }
-
+      
       # آمار خلاصه
       summary_df <- tibble::tibble(
         "معیار"   = c("تعداد روز", "میانگین دما", "حداقل دما",
@@ -173,7 +176,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
           round(mean(df$wind_speed, na.rm = TRUE), 1)
         )
       )
-
+      
       list(
         station      = sid,
         station_name = STATIONS[[sid]]$name %||% sid,
@@ -182,7 +185,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
         date_range   = date_range
       )
     })
-
+    
     # ── پیش‌نمایش ────────────────────────────────────────────────────────────
     output$report_preview <- renderUI({
       req(report_data())
@@ -202,7 +205,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
         })
       )
     })
-
+    
     # ── دانلود Excel ──────────────────────────────────────────────────────────
     output$download_excel <- downloadHandler(
       filename = function() {
@@ -212,30 +215,28 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
       content = function(file) {
         req(report_data())
         rd <- report_data()
-
+        
         tryCatch({
           wb <- openxlsx::createWorkbook()
-
+          
           # ── صفحه ۱: خلاصه آماری ─────────────────────────────────────────
           openxlsx::addWorksheet(wb, "خلاصه آماری")
-          # ردیف ۱: عنوان گزارش
           openxlsx::writeData(wb, "خلاصه آماری",
-            x        = input$report_title,
-            startRow = 1, startCol = 1
+                              x        = input$report_title,
+                              startRow = 1, startCol = 1
           )
           openxlsx::addStyle(wb, "خلاصه آماری",
-            style = openxlsx::createStyle(
-              fontSize   = 14,
-              fontColour = "#FFFFFF",
-              fgFill     = COLORS$primary,
-              halign     = "center",
-              bold       = TRUE
-            ),
-            rows = 1, cols = 1:2, gridExpand = TRUE
+                             style = openxlsx::createStyle(
+                               fontSize   = 14,
+                               fontColour = "#FFFFFF",
+                               fgFill     = COLORS$primary,
+                               halign     = "center",
+                               bold       = TRUE
+                             ),
+                             rows = 1, cols = 1:2, gridExpand = TRUE
           )
           openxlsx::mergeCells(wb, "خلاصه آماری", rows = 1, cols = 1:2)
-
-          # ردیف‌های ۳ تا ۶: متادیتای گزارش (ایستگاه، بازه، تهیه‌کننده، تاریخ تولید)
+          
           meta_df <- data.frame(
             "گزارش" = c("ایستگاه", "بازه زمانی", "تهیه‌کننده", "تاریخ تولید"),
             "جزئیات" = c(rd$station_name,
@@ -246,22 +247,22 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
           )
           openxlsx::writeData(wb, "خلاصه آماری", x = meta_df, startRow = 3)
           openxlsx::addStyle(wb, "خلاصه آماری",
-            style = openxlsx::createStyle(textDecoration = "bold", fgFill = "#e8eef7"),
-            rows = 3:6, cols = 1, gridExpand = TRUE
+                             style = openxlsx::createStyle(textDecoration = "bold", fgFill = "#e8eef7"),
+                             rows = 3:6, cols = 1, gridExpand = TRUE
           )
-          # جدول آمار توصیفی از ردیف ۹
+          
           openxlsx::writeData(wb, "خلاصه آماری",
-            x        = rd$summary,
-            startRow = 9
+                              x        = rd$summary,
+                              startRow = 9
           )
           openxlsx::addStyle(wb, "خلاصه آماری",
-            style = openxlsx::createStyle(
-              fontSize = 11, fontColour = "#FFFFFF",
-              fgFill = COLORS$primary, halign = "right", bold = TRUE
-            ),
-            rows = 9, cols = 1:2, gridExpand = TRUE
+                             style = openxlsx::createStyle(
+                               fontSize = 11, fontColour = "#FFFFFF",
+                               fgFill = COLORS$primary, halign = "right", bold = TRUE
+                             ),
+                             rows = 9, cols = 1:2, gridExpand = TRUE
           )
-
+          
           # ── صفحه ۲: داده خام ───────────────────────────────────────────
           openxlsx::addWorksheet(wb, "داده تاریخی")
           openxlsx::writeDataTable(
@@ -269,7 +270,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
             x         = rd$df,
             tableName = "HistoricalData"
           )
-
+          
           # ── صفحه ۳: پیش‌بینی ───────────────────────────────────────────
           if (isTRUE(input$include_forecast) && !is.null(forecast_rv())) {
             openxlsx::addWorksheet(wb, "پیش‌بینی")
@@ -287,7 +288,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
             )
             openxlsx::writeDataTable(wb, "پیش‌بینی", x = fc_df, tableName = "Forecast")
           }
-
+          
           # ── صفحه ۴: ناهنجاری‌ها ────────────────────────────────────────
           if (isTRUE(input$include_anomalies) && !is.null(anomaly_rv())) {
             openxlsx::addWorksheet(wb, "ناهنجاری‌ها")
@@ -300,7 +301,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
               tableName = "Anomalies"
             )
           }
-
+          
           # ── صفحه ۵: تابلوی رتبه‌بندی ────────────────────────────────────
           if (isTRUE(input$include_leaderboard) && !is.null(leaderboard_rv())) {
             openxlsx::addWorksheet(wb, "رتبه‌بندی مدل‌ها")
@@ -310,130 +311,110 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
               tableName = "Leaderboard"
             )
           }
-
-          # تنظیم عرض ستون‌ها
+          
           for (sname in openxlsx::sheets(wb)) {
             openxlsx::setColWidths(wb, sname, cols = 1:10, widths = "auto")
           }
-
+          
           openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
           showNotification("فایل Excel آماده شد.", type = "message")
-
+          
         }, error = function(e) {
           showNotification(paste("خطا در ساخت Excel:", e$message),
                            type = "error", duration = 15)
         })
       }
     )
-
+    
     # ── دانلود PDF ────────────────────────────────────────────────────────────
     output$download_pdf <- downloadHandler(
       filename = function() {
-        paste0("weather_report_",
-               format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")
+        paste0("weather_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")
       },
       content = function(file) {
         req(report_data())
         rd <- report_data()
-
+        
         tryCatch({
-          # ساخت محتوای Markdown برای تبدیل به PDF
           tmp_rmd <- tempfile(fileext = ".Rmd")
-
-          # جمع‌آوری داده‌ها برای گزارش
-          fc_text      <- ""
-          lb_text      <- ""
-          anom_text    <- ""
-
+          
+          fc_text   <- ""
+          lb_text   <- ""
+          anom_text <- ""
+          
           if (isTRUE(input$include_forecast) && !is.null(forecast_rv())) {
             fr <- forecast_rv()
             fc_text <- paste0(
-              "\n## پیش‌بینی\n",
+              "## پیش‌بینی\n",
               "مدل مورد استفاده: **", fr$fc$method, "**\n\n",
               "افق پیش‌بینی: **", fr$horizon, " روز**\n\n",
-              "میانگین پیش‌بینی: **",
-              round(mean(fr$fc$predictions, na.rm = TRUE), 2), "**\n"
+              "میانگین پیش‌بینی: **", round(mean(fr$fc$predictions, na.rm = TRUE), 2), "**\n"
             )
           }
-
+          
           if (isTRUE(input$include_leaderboard) && !is.null(leaderboard_rv())) {
             lb  <- leaderboard_rv()
             best <- lb[1, ]
             lb_text <- paste0(
-              "\n## عملکرد مدل‌ها\n",
+              "## عملکرد مدل‌ها\n",
               "بهترین مدل: **", best$model, "**\n\n",
               "RMSE: **", round(best$RMSE, 3), "** | ",
               "MAE: **",  round(best$MAE, 3),  "** | ",
               "R²: **",  round(best$R2, 3),   "**\n"
             )
           }
-
+          
           if (isTRUE(input$include_anomalies) && !is.null(anomaly_rv())) {
             anom <- anomaly_rv()
             n_a  <- sum(anom$is_anomaly, na.rm = TRUE)
             anom_text <- paste0(
-              "\n## ناهنجاری‌ها\n",
+              "## ناهنجاری‌ها\n",
               "تعداد ناهنجاری‌های شناسایی‌شده: **", n_a, "**\n\n",
               "روش: **", if (nrow(anom) > 0) anom$method[1] else "نامشخص", "**\n"
             )
           }
-
-          # نوشتن فایل Rmd
+          
+          # ساخت فایل Rmd به صورت خط به خط برای جلوگیری از خطای پارسر R
           rmd_content <- paste0(
-'---
-title: "', input$report_title, '"
-subtitle: "ایستگاه: ', rd$station_name, '"
-author: "', input$analyst_name, '"
-date: "', format(Sys.Date(), "%Y-%m-%d"), '"
-output:
-  pdf_document:
-    latex_engine: xelatex
-    toc: true
-    number_sections: true
-header-includes:
-  - \\usepackage{fontspec}
-  - \\usepackage{polyglossia}
-  - \\setmainlanguage{persian}
-  - \\setotherlanguage{english}
-  - \\newfontfamily\\persianfont[Script=Arabic]{FreeSerif}
----
-
-# خلاصه اجرایی
-
-این گزارش توسط سیستم خودکار تحلیل آب‌وهوا تهیه شده است.
-
-**ایستگاه:** ', rd$station_name, '
-
-**بازه زمانی:** ', rd$date_range[1], ' تا ', rd$date_range[2], '
-
-**تعداد روزهای تحلیل:** ', nrow(rd$df), '
-
-# آمار توصیفی
-
-```{r, echo=FALSE}
-knitr::kable(rd_summary, caption = "خلاصه آماری", align = "lr")
-```
-
-',
-            fc_text,
-            anom_text,
-            lb_text,
-'
-
-# نتیجه‌گیری
-
-این گزارش بر اساس داده‌های هواشناسی تاریخی تهیه شده و اطلاعات آن
-جهت تصمیم‌گیری‌های آب‌وهوایی قابل استفاده است.
-'
+            '---\n',
+            'title: "', input$report_title, '"\n',
+            'subtitle: "ایستگاه: ', rd$station_name, '"\n',
+            'author: "', input$analyst_name, '"\n',
+            'date: "', format(Sys.Date(), "%Y-%m-%d"), '"\n',
+            'output:\n',
+            '  pdf_document:\n',
+            '    latex_engine: xelatex\n',
+            '    toc: true\n',
+            '    number_sections: true\n',
+            'header-includes:\n',
+            '  - \\usepackage{fontspec}\n',
+            '  - \\usepackage{polyglossia}\n',
+            '  - \\setmainlanguage{persian}\n',
+            '  - \\setotherlanguage{english}\n',
+            '  - \\newfontfamily\\persianfont[Script=Arabic]{FreeSerif}\n',
+            '---\n\n',
+            '# خلاصه اجرایی\n\n',
+            'این گزارش توسط سیستم خودکار تحلیل آب‌وهوا تهیه شده است.\n\n',
+            '**ایستگاه:** ', rd$station_name, '\n\n',
+            '**بازه زمانی:** ', rd$date_range[1], ' تا ', rd$date_range[2], '\n\n',
+            '**تعداد روزهای تحلیل:** ', nrow(rd$df), '\n\n',
+            '# آمار توصیفی\n\n',
+            '```{r, echo=FALSE}\n',
+            'knitr::kable(rd_summary, caption = "خلاصه آماری", align = "lr")\n',
+            '```\n\n',
+            fc_text, '\n',
+            anom_text, '\n',
+            lb_text, '\n',
+            '# نتیجه‌گیری\n\n',
+            'این گزارش بر اساس داده‌های هواشناسی تاریخی تهیه شده و اطلاعات آن\n',
+            'جهت تصمیم‌گیری‌های آب‌وهوایی قابل استفاده است.\n'
           )
-
-          writeLines(rmd_content, tmp_rmd)
-
-          # محیط برای render
+          
+          writeLines(rmd_content, tmp_rmd, useBytes = TRUE)
+          
           rd_env <- new.env()
           rd_env$rd_summary <- rd$summary
-
-          # تلاش برای render PDF
+          
           pdf_ok <- tryCatch({
             rmarkdown::render(
               tmp_rmd,
@@ -446,8 +427,7 @@ knitr::kable(rd_summary, caption = "خلاصه آماری", align = "lr")
             message("PDF render خطا: ", e$message)
             FALSE
           })
-
-          # اگر PDF موفق نشد، پیام راهنما بده — کاربر می‌تواند از دکمه HTML استفاده کند
+          
           if (!pdf_ok) {
             showNotification(
               "ساخت PDF ناموفق بود (نیاز به LaTeX/xelatex). از دکمه HTML استفاده کنید.",
@@ -456,7 +436,7 @@ knitr::kable(rd_summary, caption = "خلاصه آماری", align = "lr")
           } else {
             showNotification("فایل PDF آماده شد.", type = "message")
           }
-
+          
         }, error = function(e) {
           showNotification(
             paste("خطا در ساخت PDF:", e$message),
@@ -465,20 +445,19 @@ knitr::kable(rd_summary, caption = "خلاصه آماری", align = "lr")
         })
       }
     )
-
+    
     # ── دانلود HTML ───────────────────────────────────────────────────────────
     output$download_html <- downloadHandler(
       filename = function() {
-        paste0("weather_report_",
-               format(Sys.time(), "%Y%m%d_%H%M%S"), ".html")
+        paste0("weather_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".html")
       },
       content = function(file) {
         req(report_data())
         rd <- report_data()
-
+        
         tryCatch({
           html_content <- build_html_report(rd, input, forecast_rv(),
-                                             anomaly_rv(), leaderboard_rv())
+                                            anomaly_rv(), leaderboard_rv())
           writeLines(html_content, file, useBytes = TRUE)
           showNotification("فایل HTML آماده شد.", type = "message")
         }, error = function(e) {
@@ -497,7 +476,7 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
   fc_section   <- ""
   anom_section <- ""
   lb_section   <- ""
-
+  
   if (!is.null(forecast_rv)) {
     fr <- forecast_rv
     fc_section <- paste0(
@@ -507,7 +486,7 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
       round(mean(fr$fc$predictions, na.rm = TRUE), 2), "</b></p>"
     )
   }
-
+  
   if (!is.null(anomaly_rv)) {
     n_a <- sum(anomaly_rv$is_anomaly, na.rm = TRUE)
     anom_section <- paste0(
@@ -515,10 +494,9 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
       "<p>تعداد ناهنجاری شناسایی‌شده: <b>", n_a, "</b></p>"
     )
   }
-
+  
   if (!is.null(leaderboard_rv)) {
     best <- leaderboard_rv[1, ]
-    # جدول کامل رتبه‌بندی (تا ۱۰ مدل برتر)
     lb_rows <- tryCatch({
       lb <- utils::head(leaderboard_rv, 10)
       cols <- intersect(c("model", "RMSE", "MAE", "R2", "composite_score"), names(lb))
@@ -540,7 +518,7 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
       else ""
     )
   }
-
+  
   paste0(
     "<!DOCTYPE html><html dir='rtl' lang='fa'><head>",
     "<meta charset='UTF-8'>",

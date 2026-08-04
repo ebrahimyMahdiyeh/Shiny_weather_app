@@ -1,9 +1,6 @@
 # File: app.R — نسخه ۴ (Dark/Light mode + سایدبار راست)
 
 # ── اصلاح locale برای پشتیبانی فارسی (UTF-8) ────────────────────────────────
-# مشکل: روی ویندوز فرمت ".utf8" کار نمی‌کند — باید از کدپیج 65001 استفاده شود.
-# نکته مهم: روی ویندوز، setlocale با locale نامعتبر Warning می‌دهد نه Error.
-# بنابراین فقط tryCatch کافی نیست — باید warnings را هم بگیریم.
 tryCatch({
   if (.Platform$OS.type == "windows") {
     locs <- c("Persian_Iran.65001", "English_United States.65001",
@@ -50,7 +47,7 @@ CUSTOM_CSS <- "
   --panel2:    #1e2d45;
   --border:    rgba(99,143,232,0.15);
   --border2:   rgba(99,143,232,0.28);
-  --text:      #e2e8f0;+
+  --text:      #e2e8f0;
   --text2:     #94a3b8;
   --text3:     #64748b;
   --blue:      #3b82f6;
@@ -106,8 +103,10 @@ body, .content-wrapper, .main-footer {
   border-bottom: 1px solid var(--border) !important;
   border-right: 1px solid var(--border) !important;
   font-family: 'Vazirmatn', Tahoma, sans-serif !important;
-  font-weight: 800; font-size: 13px;
+  font-weight: 800; font-size: 15px;
   color: var(--text) !important;
+  display: flex;
+  align-items: center;
 }
 .main-header .navbar {
   background: var(--panel) !important;
@@ -115,9 +114,7 @@ body, .content-wrapper, .main-footer {
   position: relative;
   min-height: 50px;
 }
-/* دکمه همبرگر (سه‌خط) — به‌جای float (که با ساختار LTR داخلی AdminLTE
-   تداخل داره و کار نمی‌کنه) با position:absolute مستقیم می‌چسبونیمش
-   به گوشه‌ی راست navbar، که سمت سایدبار راسته. */
+/* دکمه همبرگر */
 .main-header .navbar .sidebar-toggle {
   position: absolute !important;
   top: 0 !important;
@@ -133,20 +130,30 @@ body, .content-wrapper, .main-footer {
 .main-header .navbar .sidebar-toggle:hover {
   background: var(--hover-bg) !important;
 }
-/* بقیه‌ی آیتم‌های navbar (دکمه تم، متادیتا) باید جا برای دکمه‌ی
-   همبرگر سمت راست باز بذارن */
+/* بقیه‌ی آیتم‌های navbar */
 .main-header .navbar-custom-menu,
 .main-header .navbar-nav,
 .main-header .navbar > .container-fluid {
   margin-right: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+}
+
+/* اصلاح فونت و جایگاه المان‌های داخل نوار بالا ( Navbar ) */
+.main-header .navbar-custom-menu .dropdown {
+  height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
 /* دکمه تم در navbar */
 .theme-toggle-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  padding: 6px 14px; border-radius: 20px; cursor: pointer;
   font-family: 'Vazirmatn', Tahoma, sans-serif;
-  font-size: 11px; font-weight: 700;
+  font-size: 13px; font-weight: 700;
   background: var(--input-bg); color: var(--text2);
   border: 1px solid var(--border);
   transition: all 0.2s; white-space: nowrap;
@@ -154,32 +161,24 @@ body, .content-wrapper, .main-footer {
 .theme-toggle-btn:hover { background: var(--hover-bg); color: var(--text); }
 
 /* ══ SIDEBAR (راست) ══ */
-/* shinydashboard سایدبار رو به چپ می‌ذاره — با override راست می‌کنیم */
 .main-sidebar {
   background: var(--panel) !important;
   border-right: none !important;
   border-left: 1px solid var(--border) !important;
   right: 0 !important;
   left: auto !important;
-  /* override کردن رفتار پیش‌فرض AdminLTE که سایدبار رو به چپ می‌بره */
   transform: none !important;
   -webkit-transform: none !important;
   transition: right 0.3s ease-in-out !important;
 }
 .wrapper { direction: rtl !important; }
 
-/* content باید از راست margin بخوره نه از چپ */
 .content-wrapper, .main-footer {
   margin-right: 230px !important;
   margin-left: 0 !important;
   transition: margin-right 0.3s ease-in-out;
 }
 
-/* ── اصلاح بحرانی: وقتی سایدبار جمع میشه (collapse) ─────────────────────────
-   مشکل قبلی: AdminLTE به طور پیش‌فرض سایدبار رو با transform/margin-left
-   به چپ حرکت میده. چون سایدبار ما سمت راست هست، این حرکت اشتباه باعث
-   میشد سایدبار به وسط صفحه بیاد به جای اینکه از صفحه خارج بشه.
-   راه‌حل: سایدبار رو به راست (right: -230px) حرکت میدیم تا از صفحه خارج بشه. */
 .sidebar-collapse .main-sidebar {
   right: -230px !important;
   left: auto !important;
@@ -197,8 +196,6 @@ body, .content-wrapper, .main-footer {
   -webkit-transform: none !important;
 }
 
-/* همچنین، اطمینان از اینکه استایل‌های inline که AdminLTE ممکنه اعمال کنه
-   هم override بشن */
 .sidebar-collapse .main-sidebar[style] {
   right: -230px !important;
   left: auto !important;
@@ -216,8 +213,8 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
 .sidebar-menu > li > a {
   color: var(--text2) !important;
   font-family: 'Vazirmatn', Tahoma, sans-serif !important;
-  font-size: 12px; border-radius: 8px;
-  margin: 2px 8px; padding: 9px 13px !important;
+  font-size: 14px; border-radius: 8px;
+  margin: 2px 8px; padding: 10px 13px !important;
   transition: all 0.18s; display: flex; align-items: center; gap: 8px;
 }
 .sidebar-menu > li > a:hover {
@@ -230,7 +227,7 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
 }
 .sidebar-menu > li > a > .fa { width: 16px; margin-left: 6px; }
 .sidebar .sidebar-menu .header {
-  color: var(--text3) !important; font-size: 9px;
+  color: var(--text3) !important; font-size: 11px;
   letter-spacing: 1.4px; font-weight: 800; padding: 14px 16px 5px;
   text-transform: uppercase;
 }
@@ -260,7 +257,7 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
 }
 .box-header .box-title {
   font-family: 'Vazirmatn', Tahoma, sans-serif !important;
-  font-size: 13px; font-weight: 700; color: var(--text) !important;
+  font-size: 15px; font-weight: 700; color: var(--text) !important;
 }
 
 /* ══ VALUE / INFO BOX ══ */
@@ -273,7 +270,7 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
 .value-box.bg-yellow { background: linear-gradient(135deg,#b45309,#d97706) !important; }
 .value-box.bg-red    { background: linear-gradient(135deg,#b91c1c,#dc2626) !important; }
 .value-box .value-box-number { font-family:'Vazirmatn',Tahoma,sans-serif !important; font-size:24px; font-weight:900; }
-.value-box .value-box-text   { font-family:'Vazirmatn',Tahoma,sans-serif !important; font-size:12px; }
+.value-box .value-box-text   { font-family:'Vazirmatn',Tahoma,sans-serif !important; font-size:14px; }
 .info-box { background: var(--panel) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; box-shadow: none !important; }
 .info-box-number { font-family:'Vazirmatn',Tahoma,sans-serif !important; font-weight:900 !important; }
 .info-box-text   { font-family:'Vazirmatn',Tahoma,sans-serif !important; }
@@ -289,18 +286,18 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
   border-radius: 7px !important;
   color: var(--text) !important;
   font-family: 'Vazirmatn', Tahoma, sans-serif !important;
-  font-size: 12px !important;
+  font-size: 14px !important;
   transition: border-color 0.18s, background 0.18s;
 }
 .form-control:focus { border-color: var(--blue) !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.12) !important; }
-.control-label { color: var(--text3) !important; font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.7px; }
+.control-label { color: var(--text3) !important; font-size: 12px !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.7px; }
 select option  { background: var(--panel2) !important; color: var(--text) !important; }
 
 /* Slider */
 .irs-bar,.irs-bar-edge { background: var(--blue) !important; border-color: var(--blue) !important; }
 .irs-single,.irs-from,.irs-to { background: var(--blue) !important; font-family:'Vazirmatn',Tahoma,sans-serif !important; }
 .irs-line   { background: var(--border2) !important; border: none !important; }
-.irs-min,.irs-max,.irs-grid-text { color: var(--text3) !important; background: transparent !important; font-size: 10px; }
+.irs-min,.irs-max,.irs-grid-text { color: var(--text3) !important; background: transparent !important; font-size: 12px; }
 
 /* ══ BUTTONS ══ */
 .btn {
@@ -333,21 +330,21 @@ select option  { background: var(--panel2) !important; color: var(--text) !impor
 .report-dl-card:hover { transform: translateY(-2px); border-color: var(--border2); box-shadow: 0 8px 20px rgba(0,0,0,0.22); }
 body.light-mode .report-dl-card:hover { box-shadow: 0 8px 20px rgba(30,41,59,0.10); }
 .report-dl-card .dl-icon { font-size: 2.6em; }
-.report-dl-card .dl-title { font-size: 14px; font-weight: 800; color: var(--text); margin: 2px 0 0; }
-.report-dl-card .dl-desc { font-size: 11.5px; color: var(--text3); line-height: 1.6; margin: 0; }
+.report-dl-card .dl-title { font-size: 16px; font-weight: 800; color: var(--text); margin: 2px 0 0; }
+.report-dl-card .dl-desc { font-size: 13px; color: var(--text3); line-height: 1.6; margin: 0; }
 .report-dl-card .shiny-download-link { margin-top: 4px; }
 
 /* ══ بخش «محتوای گزارش» (تب گزارش) ══ */
-.rc-sec-title { font-size: 11px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; margin: 2px 0 9px; display: flex; align-items: center; }
+.rc-sec-title { font-size: 13px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; margin: 2px 0 9px; display: flex; align-items: center; }
 .rc-chip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .rc-chip-grid .shiny-input-checkbox:not(.shiny-input-container) { display: flex; }
 .rc-chip-grid .form-group, .rc-chip-grid .shiny-input-checkbox { margin: 0 !important; display: flex !important; align-items: center; }
 .rc-chip-grid .checkbox { margin: 0 !important; width: 100%; }
 .rc-chip-grid .checkbox label {
   display: flex !important; align-items: center; gap: 7px;
-  width: 100%; margin: 0 !important; padding: 9px 11px;
+  width: 100%; margin: 0 !important; padding: 10px 12px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-  font-size: 11.5px; font-weight: 700; color: var(--text2); cursor: pointer;
+  font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer;
   transition: all .16s ease; min-height: 38px; box-sizing: border-box;
 }
 .rc-chip-grid .checkbox label:hover { border-color: var(--border2); color: var(--text); background: var(--hover-bg); }
@@ -377,17 +374,17 @@ table.dataTable thead th {
   background: var(--panel2) !important; color: var(--text3) !important;
   border-bottom: 1px solid var(--border) !important;
   font-family: 'Vazirmatn',Tahoma,sans-serif !important;
-  font-size: 10px !important; font-weight: 700 !important;
-  letter-spacing: 0.5px; text-transform: uppercase; padding: 9px 12px !important;
+  font-size: 13px !important; font-weight: 700 !important;
+  letter-spacing: 0.5px; text-transform: uppercase; padding: 10px 12px !important;
 }
 table.dataTable tbody tr { background: transparent !important; }
 table.dataTable tbody tr td {
   color: var(--text2) !important;
   border-bottom: 1px solid rgba(99,143,232,0.06) !important;
-  font-family: 'Vazirmatn',Tahoma,sans-serif !important; font-size: 12px; padding: 9px 12px !important;
+  font-family: 'Vazirmatn',Tahoma,sans-serif !important; font-size: 14px; padding: 10px 12px !important;
 }
 table.dataTable tbody tr:hover td { background: var(--hover-bg) !important; color: var(--text) !important; }
-.dataTables_info,.dataTables_length label,.dataTables_filter label { color: var(--text3) !important; font-size: 11px; }
+.dataTables_info,.dataTables_length label,.dataTables_filter label { color: var(--text3) !important; font-size: 12px; }
 .dataTables_paginate .paginate_button { color: var(--text2) !important; }
 .dataTables_paginate .paginate_button.current { background: var(--blue) !important; color: white !important; border-radius: 4px !important; }
 
@@ -428,11 +425,11 @@ hr { border-color: var(--border) !important; margin: 12px 0; }
   background: radial-gradient(circle,rgba(59,130,246,0.1) 0%,transparent 70%);
   border-radius: 50%;
 }
-.hero-banner h2 { font-size:23px; font-weight:900; line-height:1.3; color:var(--text); margin:0 0 9px; }
+.hero-banner h2 { font-size:24px; font-weight:900; line-height:1.3; color:var(--text); margin:0 0 9px; }
 .hero-banner h2 .grad { background:linear-gradient(90deg,var(--blue2),var(--teal)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.hero-banner p  { font-size:13px; color:var(--text2); line-height:1.7; max-width:700px; margin:0; }
+.hero-banner p  { font-size:14px; color:var(--text2); line-height:1.7; max-width:700px; margin:0; }
 .hero-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; }
-.hchip { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:11px; font-weight:600; }
+.hchip { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; }
 .hchip-blue   { background:rgba(59,130,246,0.12);  color:#60a5fa; border:1px solid rgba(59,130,246,0.2); }
 .hchip-teal   { background:rgba(20,184,166,0.12);  color:#2dd4bf; border:1px solid rgba(20,184,166,0.2); }
 .hchip-amber  { background:rgba(245,158,11,0.12);  color:#fbbf24; border:1px solid rgba(245,158,11,0.2); }
@@ -464,48 +461,36 @@ body.light-mode .model-card-sci:hover { box-shadow: 0 10px 22px rgba(30,41,59,0.
 .model-icon-badge.ic-green  { background: linear-gradient(135deg,#15803d,#4ade80); }
 
 .model-card-sci h4 {
-  font-size: 13.5px; font-weight: 800; color: var(--text); margin: 0;
+  font-size: 15px; font-weight: 800; color: var(--text); margin: 0;
   font-family: 'Vazirmatn',Tahoma,sans-serif; display: flex; align-items: center;
   gap: 6px; flex-wrap: wrap; row-gap: 4px;
 }
-.model-card-sci p, .model-card-sci li { font-size: 12px; color: var(--text2); line-height: 1.65; margin: 0 0 2px; }
+.model-card-sci p, .model-card-sci li { font-size: 13px; color: var(--text2); line-height: 1.65; margin: 0 0 2px; }
 
-.badge-sci { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 9.5px; font-weight: 700; }
+.badge-sci { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .badge-classic { background: rgba(59,130,246,0.14);  color: var(--blue2); }
 .badge-ml      { background: rgba(245,158,11,0.14);  color: var(--amber); }
 .badge-modern  { background: rgba(139,92,246,0.14);  color: var(--purple); }
 .badge-base    { background: rgba(100,116,139,0.14); color: var(--text3); }
 .badge-ens     { background: rgba(34,197,94,0.14);   color: var(--green); }
 
-/* فرمول — رندر واقعی با KaTeX */
-/* اصلاح: قبلاً overflow-x:auto مستقیماً روی همین باکس (که برچسب «فرمول»
-   با top:-8px از لبه‌ی بالاش بیرون زده) بود. طبق مشخصات CSS، ست‌کردن
-   overflow-x باعث می‌شه overflow-y هم به‌صورت ضمنی auto حساب بشه —
-   و همون auto ضمنی برچسب رو (چون بیرون از کادر خود باکسه) می‌بره.
-   راه‌حل: باکس بیرونی (تزئینی، بدون overflow) از رَپِر داخلیِ اسکرول‌شونده
-   جدا شد. برچسب دیگه هیچ‌وقت بریده نمی‌شه، فرمول‌های عریض هم به‌جای
-   خط‌شکستن (که تو container RTL با محتوای LTR بهم‌ریخته دیده می‌شه)
-   فقط افقی اسکرول می‌خورن. */
 .formula-box {
   background: var(--panel); border: 1px dashed var(--border2); border-radius: 8px;
   padding: 15px 14px 10px; margin: 11px 0 6px; position: relative;
 }
 .formula-box::before {
   content: 'فرمول'; position: absolute; top: -8px; right: 11px;
-  background: var(--panel2); color: var(--text3); font-size: 9px; font-weight: 800;
+  background: var(--panel2); color: var(--text3); font-size: 10px; font-weight: 800;
   letter-spacing: .4px; padding: 0 6px;
 }
-.formula-box .formula-scroll {
-  overflow-x: auto; direction: ltr;
-}
-.formula-box .katex { color: var(--teal) !important; font-size: 1.02em; }
+.formula-box .formula-scroll { overflow-x: auto; direction: ltr; }
+.formula-box .katex { color: var(--teal) !important; font-size: 1.05em; }
 body.light-mode .formula-box .katex { color: #0d9488 !important; }
 .formula-box .katex-display { margin: 0; }
 .formula-box .katex-html { direction: ltr; white-space: nowrap; }
 
-/* موافق/مخالف — گرید دو ستونه */
 .proscons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-top: 10px; }
-.pc-item { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: var(--text2); line-height: 1.5; }
+.pc-item { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; color: var(--text2); line-height: 1.5; }
 .pc-icon {
   width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
   display: flex; align-items: center; justify-content: center; font-size: 8px;
@@ -516,9 +501,9 @@ body.light-mode .formula-box .katex { color: #0d9488 !important; }
 
 /* ══ جدول مقایسه سریع ══ */
 .compare-wrap { overflow-x: auto; }
-.compare-table { width: 100%; border-collapse: collapse; font-size: 11.5px; min-width: 620px; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
 .compare-table th {
-  text-align: right; color: var(--text3); font-size: 9.5px; text-transform: uppercase;
+  text-align: right; color: var(--text3); font-size: 11px; text-transform: uppercase;
   letter-spacing: .6px; font-weight: 800; padding: 6px 9px; border-bottom: 1px solid var(--border);
 }
 .compare-table td { padding: 8px 9px; border-bottom: 1px solid rgba(99,143,232,0.06); color: var(--text2); vertical-align: middle; }
@@ -539,22 +524,21 @@ body.light-mode .formula-box .katex { color: #0d9488 !important; }
 .metric-card-head { display: flex; align-items: center; gap: 9px; margin-bottom: 2px; }
 .metric-card-head .model-icon-badge { width: 30px; height: 30px; border-radius: 9px; }
 .metric-card-head .model-icon-badge i { font-size: 12px; }
-.metric-title { font-size: 11.5px; font-weight: 800; color: var(--text); }
-.metric-desc  { font-size: 10px; color: var(--text3); margin-top: 1px; }
-.weight-caption { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; font-weight: 800; margin-top: 10px; margin-bottom: 4px; }
+.metric-title { font-size: 13px; font-weight: 800; color: var(--text); }
+.metric-desc  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.weight-caption { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; font-weight: 800; margin-top: 10px; margin-bottom: 4px; }
 .weight-row { display: flex; align-items: center; gap: 8px; }
 .weight-track { flex: 1; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
 .weight-fill  { height: 100%; border-radius: 3px; background: linear-gradient(90deg,var(--blue),var(--teal)); }
-.weight-pct   { font-size: 10.5px; color: var(--text2); font-weight: 800; white-space: nowrap; min-width: 28px; }
-.weight-note  { font-size: 9px; color: var(--text3); margin-top: 4px; }
+.weight-pct   { font-size: 12px; color: var(--text2); font-weight: 800; white-space: nowrap; min-width: 28px; }
+.weight-note  { font-size: 10px; color: var(--text3); margin-top: 4px; }
 
-/* پنل نمره ترکیبی */
 .composite-panel { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.22); border-radius: 10px; padding: 13px 14px 12px; }
-.composite-panel .cp-title { font-size: 11.5px; font-weight: 800; color: var(--green); display: flex; align-items: center; gap: 6px; }
-.composite-panel .cp-note { font-size: 10px; color: var(--text3); margin-top: 6px; }
+.composite-panel .cp-title { font-size: 13px; font-weight: 800; color: var(--green); display: flex; align-items: center; gap: 6px; }
+.composite-panel .cp-note { font-size: 11px; color: var(--text3); margin-top: 6px; }
 .stack-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 11px 0 9px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
 
-/* ══ تب دسته‌های مدل (nav-tabs-custom) ══ */
+/* ══ تب دسته‌های مدل ══ */
 .nav-tabs-custom { background: transparent !important; box-shadow: none !important; border-radius: var(--radius) !important; margin-bottom: 0 !important; }
 .nav-tabs-custom > .nav-tabs {
   background: var(--panel) !important; border: 1px solid var(--border) !important; border-bottom: none !important;
@@ -565,7 +549,7 @@ body.light-mode .formula-box .katex { color: #0d9488 !important; }
 .nav-tabs-custom > .nav-tabs > li.header { display: none; }
 .nav-tabs-custom > .nav-tabs > li > a {
   border: none !important; background: transparent !important; color: var(--text3) !important;
-  font-family: 'Vazirmatn',Tahoma,sans-serif !important; font-size: 12px !important; font-weight: 700;
+  font-family: 'Vazirmatn',Tahoma,sans-serif !important; font-size: 14px !important; font-weight: 700;
   border-radius: 8px 8px 0 0 !important; padding: 9px 16px !important;
   display: flex !important; align-items: center; gap: 7px; margin: 0 !important;
 }
@@ -581,28 +565,23 @@ body.light-mode .formula-box .katex { color: #0d9488 !important; }
   border-radius: 0 0 var(--radius) var(--radius) !important; padding: 18px !important; box-shadow: var(--shadow);
 }
 
-
 /* ══ SIDEBAR STATUS ══ */
-.sidebar-status { padding:12px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--text3); margin-top:8px; }
+.sidebar-status { padding:12px 14px; border-top:1px solid var(--border); font-size:13px; color:var(--text3); margin-top:8px; }
 .status-dot { display:inline-block; width:6px; height:6px; background:var(--green); border-radius:50%; margin-left:5px; animation:pulse 2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-/* ══ CTRL LABEL ══ */
-.ctrl-label-sci { font-size:9px; font-weight:800; color:var(--text3); text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; margin-top:8px; font-family:'Vazirmatn',Tahoma,sans-serif; display:block; }
+.ctrl-label-sci { font-size:12px; font-weight:800; color:var(--text3); text-transform:uppercase; letter-spacing:.8px; margin-bottom:4px; margin-top:8px; font-family:'Vazirmatn',Tahoma,sans-serif; display:block; }
 
-/* ══ VERBATIM ══ */
-pre.shiny-text-output { background:var(--panel2) !important; border:1px solid var(--border) !important; border-radius:6px !important; color:var(--teal) !important; font-size:10px !important; padding:9px 11px !important; direction:ltr; text-align:left; }
+pre.shiny-text-output { background:var(--panel2) !important; border:1px solid var(--border) !important; border-radius:6px !important; color:var(--teal) !important; font-size:12px !important; padding:9px 11px !important; direction:ltr; text-align:left; }
 
-/* ══ DOWNLOAD ══ */
 .shiny-download-link { display:block; width:100%; text-align:center; }
 
-/* ══ SECTION TITLES ══ */
-.section-title-sci { font-size:14px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:14px; }
+.section-title-sci { font-size:16px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:14px; }
 .section-title-sci .dot { width:3px; height:20px; border-radius:2px; background:var(--blue); flex-shrink:0; }
 "
 
 # ══════════════════════════════════════════════════════════════════════════════
-# JS — toggle theme + اصلاح رفتار سایدبار راست
+# JS
 # ══════════════════════════════════════════════════════════════════════════════
 THEME_JS <- "
 function toggleTheme() {
@@ -621,20 +600,10 @@ function toggleTheme() {
   }
 }
 
-// ── اصلاح رفتار دکمه‌ی toggle سایدبار ──────────────────────────────────────
-// مشکل: AdminLTE به طور پیش‌فرض سایدبار رو به چپ حرکت میده (transform: translate).
-// چون سایدبار ما سمت راست هست، این رفتار اشتباهه.
-// راه‌حل: بعد از هر کلیک روی دکمه‌ی toggle، اطمینان حاصل می‌کنیم که
-// فقط کلاس sidebar-collapse روی body toggle بشه و CSS سفارشی ما کار کنه.
 function fixSidebarToggle() {
   var toggleBtn = document.querySelector('.main-header .navbar .sidebar-toggle');
   if (!toggleBtn) return;
-
   toggleBtn.addEventListener('click', function(e) {
-    // اجازه نمیدیم AdminLTE رفتار پیش‌فرض خودش رو انجام بده
-    // e.preventDefault();  // اگر این رو فعال کنیم، shinydashboard خودش کار نمی‌کنه
-
-    // بعد از یه delay کوچیک، هر transform ای که AdminLTE گذاشته رو پاک می‌کنیم
     setTimeout(function() {
       var sidebar = document.querySelector('.main-sidebar');
       if (sidebar) {
@@ -649,14 +618,9 @@ function fixSidebarToggle() {
         content.style.marginLeft = '';
       }
     }, 50);
-  }, true);  // capture phase برای اجرای زودتر
+  }, true);
 }
 
-// ── رندر فرمول‌های ریاضی (KaTeX) در بخش «راهنمای مدل‌ها» ───────────────────
-// المنت‌هایی با کلاس tex-formula و اتریبیوت data-tex پیدا و با KaTeX
-// به‌صورت فرمول واقعی رندر می‌شن. چون تمام تب‌ها (حتی مخفی) از ابتدا در
-// DOM هستن (رفتار پیش‌فرض shinydashboard)، نیازی به رندر مجدد هنگام
-// جابه‌جایی تب نیست — فقط یک‌بار در لود صفحه کافیه.
 function renderMathFormulas() {
   if (typeof katex === 'undefined') return;
   document.querySelectorAll('.tex-formula').forEach(function(el) {
@@ -666,13 +630,10 @@ function renderMathFormulas() {
     try {
       katex.render(tex, el, { throwOnError: false, displayMode: true });
       el.dataset.rendered = '1';
-    } catch (e) {
-      // در صورت خطای احتمالی در یک فرمول، بقیه رو مختل نمی‌کنیم
-    }
+    } catch (e) {}
   });
 }
 
-// اعمال تم ذخیره‌شده هنگام بارگذاری
 document.addEventListener('DOMContentLoaded', function() {
   var saved = localStorage.getItem('wfs_theme') || 'dark';
   var btn = document.getElementById('theme-btn');
@@ -682,14 +643,11 @@ document.addEventListener('DOMContentLoaded', function() {
   } else {
     if (btn) btn.innerHTML = '<i class=\"fa fa-moon\"></i> دارک';
   }
-
-  // فعال‌سازی fix سایدبار
   fixSidebarToggle();
   renderMathFormulas();
 });
 
-// اگر DOMContentLoaded قبلاً رخ داده باشه (مثلاً با Shiny)
-$(document).on('shiny:connected', function() {
+ $(document).on('shiny:connected', function() {
   setTimeout(fixSidebarToggle, 100);
   setTimeout(renderMathFormulas, 100);
 });
@@ -699,7 +657,6 @@ $(document).on('shiny:connected', function() {
 # توابع کمکی — بخش «راهنمای مدل‌ها»
 # ══════════════════════════════════════════════════════════════════════════════
 
-# نوار ۵ بخشی برای نمایش امتیاز کیفی در جدول مقایسه سریع
 mg_meter <- function(rating) {
   tags$span(class = "meter",
             lapply(1:5, function(i)
@@ -708,7 +665,6 @@ mg_meter <- function(rating) {
   )
 }
 
-# یک ردیف از جدول مقایسه سریع مدل‌ها
 mg_compare_row <- function(name, category, dot_color, accuracy, speed, interpretability) {
   tags$tr(
     tags$td(tags$span(class = paste0("mini-dot dot-", dot_color)), name),
@@ -719,7 +675,6 @@ mg_compare_row <- function(name, category, dot_color, accuracy, speed, interpret
   )
 }
 
-# کارت معرفی یک مدل (آیکن، توضیح، فرمول KaTeX، نقاط قوت/ضعف)
 mg_model_card <- function(icon, color, title, badges = NULL, desc = NULL,
                           formula_tex = NULL, pros = NULL, cons = NULL) {
   tags$div(class = "model-card-sci",
@@ -749,7 +704,6 @@ mg_model_card <- function(icon, color, title, badges = NULL, desc = NULL,
   )
 }
 
-# کارت معیار ارزیابی (فرمول KaTeX + نوار وزن در امتیاز نهایی)
 mg_metric_card <- function(icon, hex, title, formula_tex, desc, weight, note = NULL) {
   tags$div(class = "metric-card",
            tags$div(class = "metric-card-head",
@@ -785,16 +739,16 @@ ui <- shinydashboard::dashboardPage(
   # ── هدر با دکمه تم در سمت چپ navbar ──────────────────────────────────────
   shinydashboard::dashboardHeader(
     title = tags$span(
-      style = "font-family:'Vazirmatn',Tahoma,sans-serif;font-weight:800;font-size:13px;color:var(--text);",
-      tags$i(class="fa fa-satellite-dish", style="margin-left:7px;color:#60a5fa;"),
+      style = "font-family:'Vazirmatn',Tahoma,sans-serif;font-weight:800;font-size:15px;color:var(--text);display:flex;align-items:center;height:50px;",
+      tags$i(class="fa fa-satellite-dish", style="margin-left:8px;color:#60a5fa;font-size:18px;"),
       "WFS Dashboard"
     ),
     titleWidth = 240,
     
-    # دکمه تم در سمت چپ نوار
+    # دکمه تم در سمت چپ نوار (اصلاح ارتفاع و فونت)
     tags$li(
       class = "dropdown",
-      style = "display:flex;align-items:center;padding:0 10px;",
+      style = "display:flex;align-items:center;height:50px;padding:0 15px;",
       tags$button(
         id    = "theme-btn",
         class = "theme-toggle-btn",
@@ -803,17 +757,17 @@ ui <- shinydashboard::dashboardPage(
       )
     ),
     
-    # متادیتا
+    # متادیتا (اصلاح ارتفاع، فاصله و فونت)
     tags$li(
       class = "dropdown",
-      style = "display:flex;align-items:center;padding:0 14px;gap:14px;font-size:11px;color:var(--text3);",
-      tags$span(style="display:flex;align-items:center;gap:4px;",
-                tags$i(class="fa fa-database",style="color:#3b82f6;"), "۱۸۵K رکورد"),
-      tags$span(style="display:flex;align-items:center;gap:4px;",
-                tags$i(class="fa fa-location-dot",style="color:#14b8a6;"), "۵ ایستگاه"),
+      style = "display:flex;align-items:center;height:50px;padding:0 20px;gap:20px;font-size:13px;color:var(--text3);font-weight:600;",
+      tags$span(style="display:flex;align-items:center;gap:6px;",
+                tags$i(class="fa fa-database",style="color:#3b82f6;font-size:14px;"), "۱۸۵K رکورد"),
+      tags$span(style="display:flex;align-items:center;gap:6px;",
+                tags$i(class="fa fa-location-dot",style="color:#14b8a6;font-size:14px;"), "۵ ایستگاه"),
       tags$span(
-        style="background:rgba(20,184,166,.12);border:1px solid rgba(20,184,166,.3);color:#14b8a6;border-radius:5px;padding:3px 9px;font-size:10px;font-weight:700;",
-        tags$i(class="fa fa-flask",style="margin-left:4px;"), "تحقیقاتی"
+        style="background:rgba(20,184,166,.12);border:1px solid rgba(20,184,166,.3);color:#14b8a6;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;",
+        tags$i(class="fa fa-flask",style="font-size:13px;"), "تحقیقاتی"
       )
     )
   ),
@@ -822,13 +776,11 @@ ui <- shinydashboard::dashboardPage(
   shinydashboard::dashboardSidebar(
     width = 228,
     
-    # CSS + JS + Font Awesome
     tags$style(HTML(CUSTOM_CSS)),
     tags$script(HTML(THEME_JS)),
     tags$head(
       tags$link(rel="stylesheet",
                 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
-      # KaTeX — برای رندر فرمول‌های ریاضی در بخش «راهنمای مدل‌ها»
       tags$link(rel="stylesheet",
                 href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css",
                 integrity="sha384-vlBdW0r3AcZO/HboRPznQNowvexd3fY8qHOWkBi5q7KGgqJ+F48+DceybYmrVbmB",
@@ -843,17 +795,17 @@ ui <- shinydashboard::dashboardPage(
       style="padding:16px 14px 13px;border-bottom:1px solid var(--border);",
       tags$div(style="display:flex;align-items:center;gap:9px;",
                tags$div(
-                 style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#3b82f6,#14b8a6);display:flex;align-items:center;justify-content:center;flex-shrink:0;",
-                 tags$i(class="fa fa-satellite-dish",style="color:white;font-size:14px;")
+                 style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#3b82f6,#14b8a6);display:flex;align-items:center;justify-content:center;flex-shrink:0;",
+                 tags$i(class="fa fa-satellite-dish",style="color:white;font-size:16px;")
                ),
                tags$div(
-                 tags$div(style="font-size:12px;font-weight:800;color:var(--text);line-height:1.2;","پیش‌بینی آب‌وهوا"),
-                 tags$div(style="font-size:9px;color:var(--text3);margin-top:1px;","Weather Forecast System")
+                 tags$div(style="font-size:14px;font-weight:800;color:var(--text);line-height:1.2;","پیش‌بینی آب‌وهوا"),
+                 tags$div(style="font-size:11px;color:var(--text3);margin-top:2px;","Weather Forecast System")
                )
       )
     ),
     
-    tags$p(style="padding:12px 15px 4px;font-size:9px;font-weight:800;letter-spacing:1.4px;color:var(--text3);text-transform:uppercase;margin:0;",
+    tags$p(style="padding:12px 15px 4px;font-size:11px;font-weight:800;letter-spacing:1.4px;color:var(--text3);text-transform:uppercase;margin:0;",
            "منو اصلی"),
     
     shinydashboard::sidebarMenu(
@@ -872,8 +824,8 @@ ui <- shinydashboard::dashboardPage(
                       tags$span(class="status-dot"),
                       tags$span(style="color:var(--text2);","۵ ایستگاه فعال")
              ),
-             tags$div(style="font-size:10px;color:var(--text3);","داده: ۲۰۲۱–۲۰۲۵"),
-             tags$div(style="margin-top:6px;display:inline-block;background:rgba(59,130,246,.1);color:#60a5fa;border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700;",
+             tags$div(style="font-size:12px;color:var(--text3);","داده: ۲۰۲۱–۲۰۲۵"),
+             tags$div(style="margin-top:6px;display:inline-block;background:rgba(59,130,246,.1);color:#60a5fa;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;",
                       "v1.0 · R Shiny")
     )
   ),
@@ -891,10 +843,9 @@ ui <- shinydashboard::dashboardPage(
       # راهنمای مدل‌ها
       shinydashboard::tabItem(tabName="model_guide",
                               
-                              # ── هیرو ──────────────────────────────────────────────────────────────
                               fluidRow(column(12,
                                               tags$div(class="hero-banner",
-                                                       tags$span(style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#60a5fa;border-radius:20px;padding:4px 11px;font-size:10px;font-weight:700;margin-bottom:10px;",
+                                                       tags$span(style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#60a5fa;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;margin-bottom:10px;",
                                                                  tags$i(class="fa fa-book"), "راهنمای جامع"),
                                                        tags$h2("مدل‌های پیش‌بینی و ", tags$span(class="grad","معیارهای ارزیابی")),
                                                        tags$p("توضیح کامل ۱۱ مدل پیش‌بینی، کاربردها، نقاط قوت و ضعف، و فرمول‌های ریاضی — به‌همراه مقایسه سریع و سهم هر معیار در امتیاز نهایی."),
@@ -907,12 +858,11 @@ ui <- shinydashboard::dashboardPage(
                                               )
                               )),
                               
-                              # ── مقایسه سریع ───────────────────────────────────────────────────────
                               fluidRow(column(12,
                                               shinydashboard::box(
                                                 title=tags$span(tags$i(class="fa fa-list-check",style="margin-left:6px;color:#4ade80;"),"مقایسه سریع مدل‌ها"),
                                                 width=12, status="success",
-                                                tags$p(style="font-size:11px;color:var(--text3);margin:-4px 0 12px;",
+                                                tags$p(style="font-size:13px;color:var(--text3);margin:-4px 0 12px;",
                                                        "مقایسه‌ای کیفی بر پایه ویژگی‌های شناخته‌شده هر روش — برای نتایج واقعی روی داده‌های این پروژه به تب «رتبه‌بندی مدل‌ها» مراجعه کنید. برچسب «دستی» یعنی آن مدل از چرخه‌ی خودکار AutoML/Ensemble خارج است ولی همچنان از صفحه پیش‌بینی قابل انتخاب دستی است."),
                                                 tags$div(class="compare-wrap",
                                                          tags$table(class="compare-table",
@@ -938,7 +888,6 @@ ui <- shinydashboard::dashboardPage(
                                               )
                               )),
                               
-                              # ── دسته‌های مدل (تب) + معیارهای ارزیابی ────────────────────────────────
                               fluidRow(
                                 column(8,
                                        shinydashboard::tabBox(id="model_cat_tabs", width=12,
@@ -1041,10 +990,11 @@ ui <- shinydashboard::dashboardPage(
                                                                 ),
                                                                 mg_model_card(
                                                                   icon="layer-group", color="green", title="AutoML Ensemble",
-                                                                  badges=list(list("Weighted","badge-ens")),
-                                                                  desc="میانگین وزنی خروجی چند مدل، با وزن معکوسِ خطای هرکدام — انتخاب خودکار بهترین مدل پایه",
-                                                                  formula_tex=r"(\hat{y} = \sum_i w_i \hat{y}_i \qquad w_i = \dfrac{1/\text{score}_i}{\sum_j 1/\text{score}_j})",
-                                                                  pros=c("بهترین عملکرد کلی","مقاوم در برابر ضعف تک‌مدلی")
+                                                                  badges=list(list("Smart Softmax","badge-ens")),
+                                                                  desc="ترکیب هوشمند خروجی مدل‌های قوی (فیلتر کردن مدل‌های ضعیف) با استفاده از وزن‌دهی Softmax برای تمرکز روی بهترین مدل و اصلاح خطاهای کوچک آن.",
+                                                                  formula_tex=r"(\hat{y} = \sum_{i} w_i \hat{y}_i \qquad w_i = \dfrac{e^{-\beta \cdot \text{RMSE}_i}}{\sum_{j} e^{-\beta \cdot \text{RMSE}_j}})",
+                                                                  pros=c("پایداری بالا در برابر نوسانات","کاهش خطاهای فاجعه‌بار"),
+                                                                  cons=c("زمان اجرا برابر با مجموع مدل‌های پایه")
                                                                 )
                                                               )
                                        )
@@ -1080,7 +1030,7 @@ ui <- shinydashboard::dashboardPage(
                                            formula_tex=r"(R^2 = 1 - \dfrac{\sum (y-\hat y)^2}{\sum (y-\bar y)^2})",
                                            desc="ضریب تعیین — بالاتر = بهتر (۰ تا ۱)", weight=0.20
                                          ),
-
+                                         
                                          tags$div(class="composite-panel",
                                                   tags$div(class="cp-title", tags$i(class="fa fa-trophy"), "نمره ترکیبی"),
                                                   tags$div(class="stack-bar",
@@ -1121,16 +1071,8 @@ server <- function(input, output, session) {
                leaderboard_rv  = leaderboard_rv)
 }
 
-# (حذف شد) install.packages("catboost") — این پکیج روی CRAN نیست و باعث
-# اخطار می‌شد. اگر catboost نیاز دارید، از GitHub نصب کنید:
-#   remotes::install_github("catboost/catboost", subdir = "catboost/R-package")
-
-# ── اجرای اپ در مرورگر خارجی (به جای Viewer داخلی RStudio) ─────────────────
-# مشکل: Viewer داخلی RStudio روی ویندوز با کاراکترهای فارسی مشکل دارد.
-# راه‌حل: اپ را در مرورگر پیش‌فرض سیستم باز می‌کنیم که UTF-8 را کامل پشتیبانی می‌کند.
 app_obj <- shinyApp(ui, server)
 
-# اگر اپ مستقیماً (نه به عنوان module) اجرا می‌شود، آن را در مرورگر باز کن
 if (identical(environment(), globalenv()) &&
     !exists("shiny_test_mode", envir = globalenv())) {
   options(shiny.launch.browser = TRUE)  # مرورگر خارجی

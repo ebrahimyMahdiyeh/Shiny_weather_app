@@ -1,5 +1,4 @@
-
-# File: modules/forecast_module.R  (نسخه نهایی پایدار)
+# File: modules/forecast_module.R  (نسخه نهایی پایدار + AutoML Ensemble پنهان)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Helperهای تبدیل کد و سرعت ──────────────────────────────────────────────
@@ -121,208 +120,212 @@ fetch_hourly_forecast <- function(lat, lon, tz = "Asia/Tehran") {
 forecastUI <- function(id) {
   ns <- NS(id)
   tagList(
-    tags$style(HTML("
-      /* PREMIUM NOW CARD */
-      .weather-hero{
-        background:linear-gradient(135deg,#0d1b35 0%,#0f2347 55%,#0a1628 100%);
-        border:1px solid rgba(99,143,232,.15);
-        border-radius:16px;
-        padding:24px 28px;
-        margin-bottom:16px;
-        display:grid;
-        grid-template-columns: 1.2fr 1px 2fr; 
-        gap:32px; 
-        position:relative;
-        overflow:hidden;
-      }
-      .weather-hero::before{
-        content:'';position:absolute;top:-100px;left:-100px;width:300px;height:300px;
-        background:radial-gradient(circle,rgba(59,130,246,.08) 0%,transparent 70%);
-        border-radius:50%;pointer-events:none;
-      }
-      .hero-divider{width:1px;background:rgba(99,143,232,.1);height:100%;}
-      .hero-main{display:flex;flex-direction:column;justify-content:space-between;z-index:1;}
-      .loc-time{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
-      .loc-time .city{font-size:14px;font-weight:700;color:#fff;}
-      .loc-time .time{font-size:11px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.05);padding:2px 8px;border-radius:10px;}
-      .temp-block{display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;}
-      .big-temp{font-size:72px;font-weight:900;line-height:1;color:#fff;letter-spacing:-3px;}
-      .big-temp sup{font-size:24px;font-weight:400;color:rgba(255,255,255,.4);vertical-align:super;}
-      .big-icon{font-size:56px;line-height:1;margin-top:5px;}
-      .cond-feels{display:flex;align-items:center;gap:12px;margin-bottom:15px;}
-      .cond{font-size:15px;font-weight:700;color:#e2e8f0;}
-      .chip{font-size:11px;font-weight:600;color:#94a3b8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:4px 10px;border-radius:20px;}
-      .hero-trend{margin-top:auto;border-top:1px solid rgba(255,255,255,.05);padding-top:10px;}
-      .trend-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
-      
-      .hero-metrics{display:flex;flex-direction:column;z-index:1;}
-      .metrics-header{font-size:10px;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
-      .today-summary{display:flex;gap:16px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.05);}
-      .today-item{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#e2e8f0;}
-      .today-item i{font-size:11px;}
-      .metric-grid{
-        display:grid;
-        grid-template-columns:repeat(4, 1fr); 
-        gap:16px 16px;
-      }
-      .metric-item{display:flex;flex-direction:column;gap:3px;}
-      .m-icon-lbl{display:flex;align-items:center;gap:5px;}
-      .m-icon{font-size:10px;color:#60a5fa;width:12px;text-align:center;}
-      .m-lbl{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;}
-      .m-val{font-size:13px;font-weight:700;color:#e2e8f0;padding-right:12px;}
-      
-      @media (max-width: 1100px) {
-        .weather-hero { grid-template-columns: 1fr; }
-        .hero-divider { display:none; }
-      }
+    tags$div(class="fc-wrapper",
+             tags$style(HTML("
+        .fc-wrapper {
+          font-size: 15px;
+          color: #cbd5e1;
+          font-family: 'Vazirmatn', sans-serif;
+        }
+        .fc-wrapper .box-title { font-size: 16px !important; font-weight: 800 !important; }
+        .fc-wrapper label { font-size: 14px !important; font-weight: 600; }
+        .fc-wrapper .form-control, .fc-wrapper .selectize-input { font-size: 14px !important; }
 
-      /* HOURLY */
-      .hourly-strip{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:thin;scrollbar-color:rgba(99,143,232,.15) transparent;direction:rtl;}
-      .hourly-strip::-webkit-scrollbar{height:3px;}
-      .hourly-strip::-webkit-scrollbar-thumb{background:rgba(99,143,232,.18);border-radius:2px;}
-      .hour-card{flex-shrink:0;background:rgba(255,255,255,.025);border:1px solid rgba(99,143,232,.1);border-radius:10px;padding:9px 10px;text-align:center;min-width:60px;transition:all .15s;cursor:default;}
-      .hour-card:hover{background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.22);}
-      .hour-card.now-hour{background:rgba(59,130,246,.13);border-color:rgba(59,130,246,.38);}
-      .hour-time{font-size:10px;color:#64748b;font-weight:600;}
-      .hour-icon{font-size:18px;margin:3px 0;}
-      .hour-temp{font-size:14px;font-weight:800;color:#e2e8f0;}
-      .hour-prob{font-size:9px;color:#60a5fa;margin-top:2px;}
+        .weather-hero{
+          background:linear-gradient(135deg,#0d1b35 0%,#0f2347 55%,#0a1628 100%);
+          border:1px solid rgba(99,143,232,.15);
+          border-radius:16px;
+          padding:24px 28px;
+          margin-bottom:16px;
+          display:grid;
+          grid-template-columns: 1.2fr 1px 2fr; 
+          gap:32px; 
+          position:relative;
+          overflow:hidden;
+        }
+        .weather-hero::before{
+          content:'';position:absolute;top:-100px;left:-100px;width:300px;height:300px;
+          background:radial-gradient(circle,rgba(59,130,246,.08) 0%,transparent 70%);
+          border-radius:50%;pointer-events:none;
+        }
+        .hero-divider{width:1px;background:rgba(99,143,232,.1);height:100%;}
+        .hero-main{display:flex;flex-direction:column;justify-content:space-between;z-index:1;}
+        .loc-time{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+        .loc-time .city{font-size:16px;font-weight:800;color:#fff;}
+        .loc-time .time{font-size:12px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.05);padding:3px 10px;border-radius:10px;}
+        .temp-block{display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;}
+        .big-temp{font-size:68px;font-weight:900;line-height:1;color:#fff;letter-spacing:-3px;}
+        .big-temp sup{font-size:24px;font-weight:400;color:rgba(255,255,255,.4);vertical-align:super;}
+        .big-icon{font-size:56px;line-height:1;margin-top:5px;}
+        .cond-feels{display:flex;align-items:center;gap:12px;margin-bottom:15px;}
+        .cond{font-size:16px;font-weight:700;color:#e2e8f0;}
+        .chip{font-size:13px;font-weight:600;color:#94a3b8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:4px 12px;border-radius:20px;}
+        .hero-trend{margin-top:auto;border-top:1px solid rgba(255,255,255,.05);padding-top:10px;}
+        .trend-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+        
+        .hero-metrics{display:flex;flex-direction:column;z-index:1;}
+        .metrics-header{font-size:12px;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
+        .today-summary{display:flex;gap:18px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.05);}
+        .today-item{display:flex;align-items:center;gap:6px;font-size:18px;font-weight:700;color:#e2e8f0;}
+        .today-item i{font-size:14px;}
+        
+        .metric-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:18px; }
+        .metric-item{display:flex;flex-direction:column;gap:5px;}
+        .m-icon-lbl{display:flex;align-items:center;gap:6px;}
+        .m-icon{font-size:14px;color:#60a5fa;width:16px;text-align:center;}
+        .m-lbl{font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;}
+        .m-val{font-size:18px;font-weight:800;color:#f8fafc;}
+        
+        @media (max-width: 1100px) {
+          .weather-hero { grid-template-columns: 1fr; }
+          .hero-divider { display:none; }
+        }
 
-      /* CHART BOX */
-      .fc-chart-box{background:#111827;border:1px solid rgba(99,143,232,.15);border-radius:10px;padding:14px 18px;margin-bottom:13px;}
-      .fc-section-lbl{font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1.1px;display:flex;align-items:center;gap:7px;margin-bottom:10px;}
-      .fc-section-lbl::after{content:'';flex:1;height:1px;background:rgba(99,143,232,.09);}
+        .hourly-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:thin;scrollbar-color:rgba(99,143,232,.15) transparent;direction:rtl;}
+        .hourly-strip::-webkit-scrollbar{height:4px;}
+        .hourly-strip::-webkit-scrollbar-thumb{background:rgba(99,143,232,.18);border-radius:2px;}
+        .hour-card{flex-shrink:0;background:rgba(255,255,255,.025);border:1px solid rgba(99,143,232,.1);border-radius:10px;padding:10px 12px;text-align:center;min-width:65px;transition:all .15s;cursor:default;}
+        .hour-card:hover{background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.22);}
+        .hour-card.now-hour{background:rgba(59,130,246,.13);border-color:rgba(59,130,246,.38);}
+        .hour-time{font-size:13px;color:#94a3b8;font-weight:600;margin-bottom:4px;}
+        .hour-icon{font-size:22px;margin:3px 0;}
+        .hour-temp{font-size:18px;font-weight:800;color:#f8fafc;}
+        .hour-prob{font-size:11px;color:#60a5fa;margin-top:3px;font-weight:600;}
 
-      /* WEEK MINI */
-      .week-mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;direction:rtl;}
-      .wm-card{background:rgba(255,255,255,.022);border:1px solid rgba(99,143,232,.09);border-radius:9px;padding:9px 5px;text-align:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
-      .wm-card:hover{border-color:rgba(99,143,232,.22);background:rgba(255,255,255,.04);}
-      .wm-card.sel{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.35);}
-      .wm-card.today-col::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#14b8a6);}
-      .wm-name{font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px;}
-      .wm-date{font-size:9px;color:#94a3b8;margin-bottom:4px;}
-      .wm-icon{font-size:18px;margin:2px 0;}
-      .wm-max{font-size:13px;font-weight:900;color:#e2e8f0;}
-      .wm-min{font-size:10px;color:#64748b;margin-top:1px;}
-      .wm-rain{font-size:9px;color:#60a5fa;font-weight:600;display:flex;align-items:center;justify-content:center;gap:2px;margin-top:3px;}
-      .wm-bar{height:3px;border-radius:2px;margin:3px auto;width:75%;background:rgba(99,143,232,.1);overflow:hidden;position:relative;}
-      .wm-bar-fill{height:100%;border-radius:2px;position:absolute;background:linear-gradient(90deg,#3b82f6,#f59e0b);}
+        .fc-chart-box{background:#111827;border:1px solid rgba(99,143,232,.15);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+        .fc-section-lbl{font-size:13px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:7px;margin-bottom:12px;}
+        .fc-section-lbl::after{content:'';flex:1;height:1px;background:rgba(99,143,232,.09);}
 
-      /* CTRL BOX */
-      .fc-ctrl-box{background:#111827;border:1px solid rgba(99,143,232,.15);border-radius:10px;padding:13px;margin-bottom:10px;}
-      .fc-ctrl-lbl{font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;display:block;}
-      
-      /* Multivariate & Compare Box */
-      .mv-box{margin-top:8px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:8px 10px;}
-      .mv-box .form-group{margin-bottom:0;}
-      .mv-box .checkbox{margin:0; padding:0; text-align:center;}
-      .mv-box .checkbox label{
-        display:flex; flex-direction:row-reverse; justify-content:center; align-items:center;
-        gap:8px; padding:0; font-size:11px; font-weight:600; color:#94a3b8; cursor:pointer;
-      }
-      .mv-box .checkbox input[type='checkbox']{
-        margin:0; position:static; cursor:pointer; width:16px; height:16px; accent-color:#22d3ee;
-      }
-      .mv-box.compare-box{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);}
-      .mv-box.compare-box .checkbox input[type='checkbox']{accent-color:#22c55e;}
-      .mv-box-disabled{margin-top:8px;background:rgba(100,116,139,.05);border:1px solid rgba(100,116,139,.15);border-radius:8px;padding:8px 10px;text-align:center;font-size:10px;color:#64748b;display:flex;align-items:center;justify-content:center;gap:6px;}
-      
-      /* EVALUATION TABLE */
-      .eval-grid{display:grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap:8px; text-align:center; margin-bottom:8px; align-items:center;}
-      .eval-row{display:contents;}
-      .eval-cell{padding:4px; border-bottom:1px solid rgba(99,143,232,.1);}
-      .eval-header{font-size:9px; color:#64748b; font-weight:700;}
-      
-      /* DAILY COMPARE STYLES */
-      .om-row{margin-top:6px;padding-top:6px;border-top:1px dashed rgba(34,197,94,0.3);}
-      .om-label{font-size:8px;color:#22c55e;font-weight:700;text-align:center;margin-bottom:2px;}
-      .daily-comp-box{margin-top:15px;background:rgba(30,41,59,.6);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:12px;}
-      
-      /* PILL SELECTOR */
-      .daily-model-selector { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-      .daily-pill {
-        padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700;
-        cursor: pointer; background: rgba(255,255,255,0.04); border: 1px solid rgba(99,143,232,0.15);
-        color: #94a3b8; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
-      }
-      .daily-pill:hover { background: rgba(59,130,246,0.1); color: #e2e8f0; }
-      .daily-pill.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #fff; }
-      .daily-pill .pill-dot { width: 8px; height: 8px; border-radius: 50%; }
-    ")),
-    
-    fluidRow(
-      column(3,
-             tags$div(class="fc-ctrl-box",
-                      tags$span(class="fc-ctrl-lbl", "ایستگاه"),
-                      selectInput(ns("station"), label=NULL, choices=NULL, width="100%"),
-                      tags$hr(style="border-color:rgba(99,143,232,.12);margin:10px 0;"),
-                      
-                      tags$span(class="fc-ctrl-lbl", "انتخاب مدل (امکان مقایسه)"),
-                      shinyWidgets::pickerInput(
-                        ns("selected_models"), label = NULL,
-                        choices = c(
-                          "ARIMA"="arima", "SARIMA"="sarima", "ETS"="ets", "TBATS"="tbats",
-                          "Prophet"="prophet", "Random Forest"="rf", "XGBoost"="xgboost",
-                          "LightGBM"="lightgbm", "CatBoost"="catboost", "SVM"="svm", "Naïve"="naive"
-                        ),
-                        selected = "xgboost", multiple = TRUE,
-                        options = list(`actions-box` = TRUE, size = 10, `selected-text-format` = "count > 2"),
-                        width = "100%"
-                      ),
-                      tags$hr(style="border-color:rgba(99,143,232,.12);margin:10px 0;"),
-                      
-                      tags$span(class="fc-ctrl-lbl", "متغیر"),
-                      selectInput(ns("target_var"), label=NULL,
-                                  choices=c("دما (°C)"="temperature","رطوبت (%)"="humidity",
-                                            "سرعت باد (km/h)"="wind_speed","بارش (mm)"="precipitation"),
-                                  width="100%"),
-                      
-                      uiOutput(ns("mv_box_ui")),
-                      
-                      tags$div(class="mv-box compare-box",
-                               checkboxInput(ns("compare_om"), label = "مقایسه با پیش‌بینی Open-Meteo", value = FALSE, width = "100%")
-                      ),
-                      
-                      actionButton(ns("run_model"),
-                                   label=tags$span(tags$i(class="fa fa-play",style="margin-left:5px;"),"اجرای مدل"),
-                                   class="btn btn-success btn-block",
-                                   style="font-size:12px;font-weight:700;padding:9px;margin-top:10px;"),
-                      
-                      uiOutput(ns("train_res_ui")),
-                      
-                      tags$hr(style="border-color:rgba(99,143,232,.12);margin:10px 0;"),
-                      
-                      actionButton(ns("refresh"),
-                                   label=tags$span(tags$i(class="fa fa-rotate",style="margin-left:5px;"),"بروزرسانی آب‌وهوا"),
-                                   class="btn btn-primary btn-block",
-                                   style="font-size:11px;font-weight:600;padding:8px;"),
-                      tags$div(style="margin-top:5px;text-align:center;font-size:10px;color:#64748b;",
-                               textOutput(ns("last_update"),inline=TRUE))
-             ),
-             uiOutput(ns("error_box"))
-      ),
-      
-      column(9,
-             uiOutput(ns("now_card")),
+        .week-mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;direction:rtl;}
+        .wm-card{background:rgba(255,255,255,.022);border:1px solid rgba(99,143,232,.09);border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+        .wm-card:hover{border-color:rgba(99,143,232,.22);background:rgba(255,255,255,.04);}
+        .wm-card.sel{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.35);}
+        .wm-card.today-col::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#14b8a6);}
+        .wm-name{font-size:12px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px;}
+        .wm-date{font-size:11px;color:#64748b;margin-bottom:6px;}
+        .wm-icon{font-size:24px;margin:4px 0;}
+        .wm-max{font-size:18px;font-weight:900;color:#f8fafc;}
+        .wm-min{font-size:14px;color:#94a3b8;margin-top:2px;font-weight:600;}
+        .wm-rain{font-size:11px;color:#60a5fa;font-weight:600;display:flex;align-items:center;justify-content:center;gap:2px;margin-top:4px;}
+        .wm-bar{height:4px;border-radius:2px;margin:4px auto;width:75%;background:rgba(99,143,232,.1);overflow:hidden;position:relative;}
+        .wm-bar-fill{height:100%;border-radius:2px;position:absolute;background:linear-gradient(90deg,#3b82f6,#f59e0b);}
+
+        .fc-ctrl-box{background:#111827;border:1px solid rgba(99,143,232,.15);border-radius:12px;padding:14px;margin-bottom:12px;}
+        .fc-ctrl-lbl{font-size:13px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;}
+        
+        .mv-box{margin-top:10px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:10px;}
+        .mv-box .form-group{margin-bottom:0;}
+        .mv-box .checkbox{margin:0; padding:0; text-align:center;}
+        .mv-box .checkbox label{
+          display:flex; flex-direction:row-reverse; justify-content:center; align-items:center;
+          gap:8px; padding:0; font-size:13px; font-weight:600; color:#94a3b8; cursor:pointer;
+        }
+        .mv-box .checkbox input[type='checkbox']{margin:0; position:static; cursor:pointer; width:16px; height:16px; accent-color:#22d3ee;}
+        .mv-box.compare-box{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);}
+        .mv-box.compare-box .checkbox input[type='checkbox']{accent-color:#22c55e;}
+        .mv-box-disabled{margin-top:10px;background:rgba(100,116,139,.05);border:1px solid rgba(100,116,139,.15);border-radius:8px;padding:10px;text-align:center;font-size:12px;color:#64748b;display:flex;align-items:center;justify-content:center;gap:6px;}
+        
+        .eval-container{margin-top:12px;background:rgba(30,41,59,.6);border:1px solid rgba(99,143,232,0.1);border-radius:8px;padding:14px;}
+        .eval-header{font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+        .eval-header i{color:#22c55e;}
+        .eval-table{width:100%;border-collapse:collapse;}
+        .eval-table th{text-align:center;color:#94a3b8;font-size:13px;font-weight:700;padding:8px 4px;border-bottom:2px solid rgba(99,143,232,0.15);}
+        .eval-table th:first-child{text-align:right;}
+        .eval-table td{text-align:center;color:#e2e8f0;font-size:15px;font-weight:700;padding:10px 4px;border-bottom:1px solid rgba(99,143,232,0.08);}
+        .eval-table td:first-child{text-align:right;color:#f1f5f9;font-weight:800;}
+        .eval-footer{display:flex;justify-content:space-between;border-top:1px solid rgba(99,143,232,.1);padding-top:12px;margin-top:8px;color:#94a3b8;font-size:13px;font-weight:600;}
+        .eval-footer span{display:flex;align-items:center;gap:5px;}
+        
+        .om-row{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(34,197,94,0.3);}
+        .om-label{font-size:10px;color:#22c55e;font-weight:700;text-align:center;margin-bottom:3px;}
+        .daily-comp-box{margin-top:15px;background:rgba(30,41,59,.6);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px;}
+        .daily-comp-header{font-size:14px;font-weight:700;color:#22c55e;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+        .comp-table{width:100%;border-collapse:collapse;}
+        .comp-table td{padding:8px 0;font-size:14px;}
+        .comp-table td:first-child{text-align:right;color:#94a3b8;}
+        .comp-table td:last-child{text-align:center;font-weight:800;color:#f8fafc;font-size:16px;}
+        
+        .daily-model-selector { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .daily-pill {
+          padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
+          cursor: pointer; background: rgba(255,255,255,0.04); border: 1px solid rgba(99,143,232,0.15);
+          color: #94a3b8; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+        }
+        .daily-pill:hover { background: rgba(59,130,246,0.1); color: #e2e8f0; }
+        .daily-pill.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #fff; }
+        .daily-pill .pill-dot { width: 10px; height: 10px; border-radius: 50%; }
+      ")),
              
-             tags$div(class="fc-chart-box",
-                      tags$div(style="display:flex;align-items:center;gap:8px;margin-bottom:10px;",
-                               tags$i(class="fa fa-clock",style="color:#60a5fa;font-size:11px;"),
-                               tags$span(style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;", "۲۴ ساعت آینده —"),
-                               tags$span(style="font-size:10px;font-weight:800;color:#60a5fa;", textOutput(ns("active_model_lbl"), inline=TRUE))
+             fluidRow(
+               column(3,
+                      tags$div(class="fc-ctrl-box",
+                               tags$span(class="fc-ctrl-lbl", "ایستگاه"),
+                               selectInput(ns("station"), label=NULL, choices=NULL, width="100%"),
+                               tags$hr(style="border-color:rgba(99,143,232,.12);margin:12px 0;"),
+                               
+                               tags$span(class="fc-ctrl-lbl", "انتخاب مدل (امکان مقایسه)"),
+                               shinyWidgets::pickerInput(
+                                 ns("selected_models"), label = NULL,
+                                 choices = c(
+                                   "ARIMA"="arima", "SARIMA"="sarima", "ETS"="ets", "TBATS"="tbats",
+                                   "Prophet"="prophet", "Random Forest"="rf", "XGBoost"="xgboost",
+                                   "LightGBM"="lightgbm", "CatBoost"="catboost", "SVM"="svm", "Naïve"="naive",
+                                   "AutoML Ensemble"="ensemble"
+                                 ),
+                                 selected = "xgboost", multiple = TRUE,
+                                 options = list(`actions-box` = TRUE, size = 10, `selected-text-format` = "count > 2"),
+                                 width = "100%"
+                               ),
+                               tags$hr(style="border-color:rgba(99,143,232,.12);margin:12px 0;"),
+                               
+                               tags$span(class="fc-ctrl-lbl", "متغیر"),
+                               selectInput(ns("target_var"), label=NULL,
+                                           choices=c("دما (°C)"="temperature","رطوبت (%)"="humidity",
+                                                     "سرعت باد (km/h)"="wind_speed","بارش (mm)"="precipitation"),
+                                           width="100%"),
+                               
+                               uiOutput(ns("mv_box_ui")),
+                               
+                               tags$div(class="mv-box compare-box",
+                                        checkboxInput(ns("compare_om"), label = "مقایسه با پیش‌بینی Open-Meteo", value = FALSE, width = "100%")
+                               ),
+                               
+                               actionButton(ns("run_model"),
+                                            label=tags$span(tags$i(class="fa fa-play",style="margin-left:5px;"),"اجرای مدل"),
+                                            class="btn btn-success btn-block",
+                                            style="font-size:14px;font-weight:700;padding:10px;margin-top:12px;"),
+                               
+                               uiOutput(ns("train_res_ui")),
+                               
+                               tags$hr(style="border-color:rgba(99,143,232,.12);margin:12px 0;"),
+                               
+                               actionButton(ns("refresh"),
+                                            label=tags$span(tags$i(class="fa fa-rotate",style="margin-left:5px;"),"بروزرسانی آب‌وهوا"),
+                                            class="btn btn-primary btn-block",
+                                            style="font-size:13px;font-weight:600;padding:10px;"),
+                               tags$div(style="margin-top:6px;text-align:center;font-size:12px;color:#64748b;",
+                                        textOutput(ns("last_update"),inline=TRUE))
                       ),
-                      uiOutput(ns("hourly_strip")),
-                      tags$div(style="margin-top:10px;", uiOutput(ns("dynamic_chart_ui")))
-             ),
-             
-             # ── ۱. پیش‌بینی ۷ روزه ──
-             uiOutput(ns("daily_forecast_section")),
-             
-             # ── ۲. نمودار اهمیت ویژگی‌ها ──
-             uiOutput(ns("feat_imp_box")),
-             # ── ۲. نمودار اهمیت ویژگی‌ها ──
-             uiOutput(ns("feat_imp_box"))
-      )
+                      uiOutput(ns("error_box"))
+               ),
+               
+               column(9,
+                      uiOutput(ns("now_card")),
+                      
+                      tags$div(class="fc-chart-box",
+                               tags$div(style="display:flex;align-items:center;gap:8px;margin-bottom:12px;",
+                                        tags$i(class="fa fa-clock",style="color:#60a5fa;font-size:14px;"),
+                                        tags$span(class="fc-section-lbl", style="margin-bottom:0;", "۲۴ ساعت آینده —"),
+                                        tags$span(style="font-size:14px;font-weight:800;color:#60a5fa;", textOutput(ns("active_model_lbl"), inline=TRUE))
+                               ),
+                               uiOutput(ns("hourly_strip")),
+                               tags$div(style="margin-top:12px;", uiOutput(ns("dynamic_chart_ui")))
+                      ),
+                      
+                      uiOutput(ns("daily_forecast_section")),
+                      uiOutput(ns("feat_imp_box"))
+               )
+             )
     )
   )
 }
@@ -332,7 +335,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    # Helper for wind direction
     deg_to_cardinal <- function(deg) {
       if (is.null(deg) || length(deg) == 0 || is.na(deg)) return("—")
       dirs <- c("شمال","شمال‌شرق","شرق","جنوب‌شرق","جنوب","جنوب‌غرب","غرب","شمال‌غرب")
@@ -365,7 +367,8 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       prophet=list(label="Prophet",color="#8b5cf6"), rf=list(label="Random Forest",color="#f59e0b"),
       xgboost=list(label="XGBoost",color="#d97706"), lightgbm=list(label="LightGBM",color="#22d3ee"),
       catboost=list(label="CatBoost",color="#fb7185"), svm=list(label="SVM",color="#ef4444"),
-      naive=list(label="Naïve",color="#64748b")
+      naive=list(label="Naïve",color="#64748b"),
+      ensemble=list(label="AutoML Ensemble",color="#22c55e") 
     )
     ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
     
@@ -383,7 +386,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         tags$div(class="mv-box",
                  checkboxInput(ns("use_multivariate"), label = "حالت چندمتغیره (اثر متقابل متغیرها)", value = FALSE, width = "100%"))
       } else {
-        tags$div(class="mv-box-disabled", tags$i(class="fa fa-lock", style="font-size:10px;"), tags$span("مدل‌های کلاسیک از حالت چندمتغیره پشتیبانی نمی‌کنند"))
+        tags$div(class="mv-box-disabled", tags$i(class="fa fa-lock", style="font-size:12px;"), tags$span("مدل‌های کلاسیک از حالت چندمتغیره پشتیبانی نمی‌کنند"))
       }
     })
     
@@ -398,12 +401,24 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     run_hourly_pred <- function() {
       sid    <- input$station %||% names(STATIONS)[1]
       target <- input$target_var %||% "temperature"
-      models_to_run <- input$selected_models
+      user_selected_models <- input$selected_models
       
-      if (is.null(models_to_run) || length(models_to_run) == 0) {
+      if (is.null(user_selected_models) || length(user_selected_models) == 0) {
         last_error(list(msg = "حداقل یک مدل را انتخاب کنید.", time = format(Sys.time(), "%H:%M")))
         showNotification("حداقل یک مدل را انتخاب کنید", type="error")
         return()
+      }
+      
+      # ── مدیریت مدل انسمبل ──
+      run_ensemble <- "ensemble" %in% user_selected_models
+      # مدل‌های پایه که انسمبل از روی آن‌ها ساخته می‌شود (پشت پرده اجرا می‌شوند)
+      ENSEMBLE_BASE_MODELS <- c("arima", "ets", "xgboost", "lightgbm")
+      
+      # مدل‌هایی که واقعاً باید در بک‌اند اجرا شوند
+      if (run_ensemble) {
+        models_to_run <- unique(c(user_selected_models[user_selected_models != "ensemble"], ENSEMBLE_BASE_MODELS))
+      } else {
+        models_to_run <- user_selected_models
       }
       
       h_data <- if (!is.null(hourly_data) && is.function(hourly_data)) {
@@ -464,7 +479,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         h_data_combined <- h_data_combined %>% dplyr::filter(timestamp <= now + 3600)
         if (nrow(h_data_combined) < 72) stop("داده معتبری تا همین لحظه وجود ندارد. لطفاً «بروزرسانی آب‌وهوا» را بزنید.")
         
-        # ── محاسبه شکاف زمانی و افق‌های پیش‌بینی ──
         last_ts <- max(h_data_combined$timestamp)
         now_hour <- as.POSIXct(paste(format(now, "%Y-%m-%d"), format(now, "%H:00:00")), tz = "Asia/Tehran")
         gap_hours <- as.integer(difftime(now_hour, last_ts, units = "hours"))
@@ -477,8 +491,9 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         start_time <- Sys.time()
         use_mv <- isTRUE(input$use_multivariate)
         
-        # ── ۱. ارزیابی تمام مدل‌ها روی ۲۴ ساعت گذشته (Backtesting) ──
+        # ── ارزیابی مدل‌های بک‌اند ──
         eval_metrics_list <- list()
+        eval_preds_list <- list() 
         eval_test <- tail(h_data_combined, 24)
         eval_train <- head(h_data_combined, nrow(h_data_combined) - 24)
         
@@ -499,11 +514,12 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               ss_tot <- sum((a - mean(a))^2)
               r2_val <- ifelse(ss_tot == 0, 0, 1 - (ss_res/ss_tot))
               eval_metrics_list[[mn]] <- list(r2 = r2_val, rmse = rmse_val, mae = mae_val, color = MODEL_META[[mn]]$color)
+              eval_preds_list[[mn]] <- p 
             }
           }
         }
         
-        # ── ۲. پیش‌بینی ۲۴ ساعت و ۷ روز آینده ──
+        # ── پیش‌بینی ۲۴ ساعت و ۷ روز آینده ──
         all_preds_24h <- list()
         all_preds_7d  <- list()
         all_feat_imp  <- list() 
@@ -532,7 +548,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             lower_24 <- if (!is.null(res_final$lower) && length(res_final$lower) >= idx_24_end) res_final$lower[idx_24_start:idx_24_end] else preds_24 - 1.5
             upper_24 <- if (!is.null(res_final$upper) && length(res_final$upper) >= idx_24_end) res_final$upper[idx_24_start:idx_24_end] else preds_24 + 1.5
             
-            all_preds_24h[[mn]] <- list(preds = as.numeric(preds_24), lower = as.numeric(lower_24), upper = as.numeric(upper_24), method = res_final$method, color = MODEL_META[[mn]]$color %||% "#ffffff")
+            all_preds_24h[[mn]] <- list(preds = as.numeric(preds_24), lower = as.numeric(lower_24), upper = as.numeric(upper_24), method = MODEL_META[[mn]]$label, color = MODEL_META[[mn]]$color)
             
             if (is_7d_success) {
               preds_168 <- res_7d$predictions[idx_24_start:(gap_hours + 168)]
@@ -551,6 +567,104 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           }
         }
         
+        # ── محاسبه مدل ترکیبی (AutoML Ensemble) ──
+        # ── محاسبه مدل ترکیبی هوشمند (Smart AutoML Ensemble) ──
+        if (run_ensemble) {
+          # ۱. بررسی مدل‌های پایه که با موفقیت اجرا شده‌اند
+          valid_models <- intersect(names(all_preds_24h), ENSEMBLE_BASE_MODELS)
+          if (length(valid_models) >= 2) {
+            # استخراج خطای (RMSE) مدل‌ها
+            rmses <- sapply(valid_models, function(mn) eval_metrics_list[[mn]]$rmse)
+            rmses[is.na(rmses) | rmses == 0] <- 1e-6
+            
+            # ── ایده ۱: فیلتر کردن مدل‌های ضعیف ──
+            # فقط مدل‌هایی که خطایشان حداکثر ۱.۵ برابر بهترین مدل است وارد ترکیب شوند
+            min_rmse <- min(rmses)
+            strong_models <- names(rmses)[rmses <= (min_rmse * 1.5)]
+            if (length(strong_models) >= 2) {
+              valid_models <- strong_models
+              rmses <- rmses[valid_models]
+            }
+            
+            # ── ایده ۲: وزن‌دهی Softmax (تمرکز روی بهترین مدل) ──
+            # هرچه beta بیشتر باشد، تمرکز روی بهترین مدل بیشتر است (پیش‌فرض: 5)
+            beta <- 5
+            exp_vals <- exp(-beta * rmses)
+            weights <- exp_vals / sum(exp_vals)
+            
+            # پیش‌بینی ۲۴ ساعته انسمبل: ŷ = Σ(w_i × ŷ_i)
+            ens_preds <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$preds * weights[mn]))
+            ens_lower <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$lower * weights[mn]))
+            ens_upper <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$upper * weights[mn]))
+            
+            all_preds_24h[["ensemble"]] <- list(
+              preds = as.numeric(ens_preds),
+              lower = as.numeric(ens_lower),
+              upper = as.numeric(ens_upper),
+              method = "AutoML Ensemble",
+              color = MODEL_META$ensemble$color
+            )
+            
+            # پیش‌بینی ۷ روزه انسمبل
+            valid_models_7d <- intersect(valid_models, names(all_preds_7d))
+            if (length(valid_models_7d) >= 2) {
+              n_days <- nrow(all_preds_7d[[ valid_models_7d[1] ]])
+              ens_max <- rowSums(sapply(valid_models_7d, function(mn) all_preds_7d[[mn]]$max_val * weights[mn]))
+              ens_min <- rowSums(sapply(valid_models_7d, function(mn) all_preds_7d[[mn]]$min_val * weights[mn]))
+              
+              all_preds_7d[["ensemble"]] <- tibble::tibble(
+                date = all_preds_7d[[ valid_models_7d[1] ]]$date,
+                max_val = ens_max,
+                min_val = ens_min
+              )
+            }
+            
+            # ارزیابی انسمبل
+            valid_eval_models <- intersect(valid_models, names(eval_preds_list))
+            if (length(valid_eval_models) >= 2) {
+              ens_eval_preds <- rowSums(sapply(valid_eval_models, function(mn) eval_preds_list[[mn]] * weights[mn]))
+              
+              actual_vals <- eval_test[[target]]
+              len <- min(length(actual_vals), length(ens_eval_preds))
+              a <- as.numeric(actual_vals[1:len])
+              p <- as.numeric(ens_eval_preds[1:len])
+              valid_idx <- !is.na(a) & !is.na(p)
+              
+              if(sum(valid_idx) > 2) {
+                a_v <- a[valid_idx]; p_v <- p[valid_idx]
+                rmse_val <- sqrt(mean((a_v - p_v)^2))
+                mae_val <- mean(abs(a_v - p_v))
+                ss_res <- sum((a_v - p_v)^2)
+                ss_tot <- sum((a_v - mean(a_v))^2)
+                r2_val <- ifelse(ss_tot == 0, 0, 1 - (ss_res/ss_tot))
+                eval_metrics_list[["ensemble"]] <- list(r2 = r2_val, rmse = rmse_val, mae = mae_val, color = MODEL_META$ensemble$color)
+              }
+            }
+            
+            # اهمیت ویژگی‌های انسمبل
+            valid_feat_models <- intersect(valid_models, names(all_feat_imp))
+            if (length(valid_feat_models) > 0) {
+              all_features <- unique(unlist(lapply(all_feat_imp[valid_feat_models], function(x) x[[1]])))
+              ens_imp <- data.frame(Feature = all_features, Gain = 0, stringsAsFactors = FALSE)
+              for (mn in valid_feat_models) {
+                w <- weights[mn]
+                df <- all_feat_imp[[mn]]
+                names(df) <- c("Feature", "Gain")
+                df$Gain <- as.numeric(df$Gain) * w
+                idx <- match(df$Feature, ens_imp$Feature)
+                ens_imp$Gain[idx] <- ens_imp$Gain[idx] + df$Gain
+              }
+              all_feat_imp[["ensemble"]] <- ens_imp
+            }
+          }
+        }
+        
+        # ── فیلتر کردن خروجی‌ها: فقط مدل‌های انتخابی کاربر در UI نمایش داده شوند ──
+        all_preds_24h <- all_preds_24h[names(all_preds_24h) %in% user_selected_models]
+        eval_metrics_list <- eval_metrics_list[names(eval_metrics_list) %in% user_selected_models]
+        all_preds_7d <- all_preds_7d[names(all_preds_7d) %in% user_selected_models]
+        all_feat_imp <- all_feat_imp[names(all_feat_imp) %in% user_selected_models]
+        
         if (length(all_preds_24h) == 0) stop("هیچ‌کدام از مدل‌های انتخاب شده خروجی معتبری تولید نکردند.")
         exec_time <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 2)
         
@@ -558,7 +672,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           for(mn in names(eval_metrics_list)) { eval_metrics_list[[mn]]$time <- exec_time }
         }
         
-        # ── ۳. محاسبه متریک‌های مقایسه ۷ روزه با Open-Meteo ──
         om_daily_agg <- NULL
         daily_comp_metrics <- list()
         if (isTRUE(input$compare_om) && target == "temperature" && !is.null(ld) && !is.null(ld$hourly)) {
@@ -694,7 +807,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     
     output$hourly_strip <- renderUI({
       ld <- live_data()
-      if (is.null(ld) || is.null(ld$hourly)) return(tags$div(style="color:#64748b;text-align:center;padding:10px;font-size:12px;", "داده‌ای دریافت نشده"))
+      if (is.null(ld) || is.null(ld$hourly)) return(tags$div(style="color:#64748b;text-align:center;padding:10px;font-size:14px;", "داده‌ای دریافت نشده"))
       now <- if (!is.null(ld$current) && !is.null(ld$current$time)) ld$current$time else Sys.time()
       h24 <- ld$hourly %>% dplyr::filter(time >= now - 3600, time <= now + 3600*24) %>% tail(24)
       if (nrow(h24) == 0) return(NULL)
@@ -702,17 +815,20 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         r <- h24[i,]; wi <- weather_icon(r$w_code, r$is_day)
         lbl <- if(i==1) "الان" else format(r$time,"%H:%M")
         pr  <- if(!is.na(r$precip_prob)&&r$precip_prob>10) paste0(round(r$precip_prob,0),"%") else ""
-        tags$div(class=if(i==1)"hour-card now-hour" else "hour-card", tags$div(class="hour-time",lbl), tags$div(class="hour-icon",wi$icon), tags$div(class="hour-temp",paste0(round(r$temp,0),"°")), if(nchar(pr)>0) tags$div(class="hour-prob", tags$i(class="fa fa-droplet",style="font-size:7px;margin-left:2px;"),pr))
+        tags$div(class=if(i==1)"hour-card now-hour" else "hour-card", 
+                 tags$div(class="hour-time",lbl), 
+                 tags$div(class="hour-icon",wi$icon), 
+                 tags$div(class="hour-temp",paste0(round(r$temp,0),"°")), 
+                 if(nchar(pr)>0) tags$div(class="hour-prob", tags$i(class="fa fa-droplet",style="font-size:10px;margin-left:2px;"),pr))
       })
       tags$div(class="hourly-strip",cards)
     })
     
-    # ── 24h Multi-model Chart ──
     output$dynamic_chart_ui <- renderUI({
       models <- input$selected_models
       mlp <- hourly_ml_pred()
       if (is.null(models) || length(models) == 0 || is.null(mlp) || length(mlp$preds_list) == 0) {
-        return(tags$div(style="text-align:center; padding:90px; color:#64748b; font-size:12px;", "روی «اجرای مدل» کلیک کنید تا پیش‌بینی ۲۴h ببینید"))
+        return(tags$div(style="text-align:center; padding:90px; color:#64748b; font-size:14px;", "روی «اجرای مدل» کلیک کنید تا پیش‌بینی ۲۴h ببینید"))
       }
       plotly::plotlyOutput(ns("main_multimodel_chart"), height="350px")
     })
@@ -733,7 +849,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           dplyr::mutate(y_val = switch(var, temperature=temp, humidity=humidity, wind_speed=wind_speed, precipitation=precip, temp))
         if (nrow(hist_h) > 0)
           p <- plotly::add_trace(p, type="scatter", mode="lines", x=hist_h$time, y=hist_h$y_val,
-                                 name="۶h گذشته (واقعی)", line=list(color="#64748b",width=1.5,dash="dot"),
+                                 name="۶h گذشته (واقعی)", line=list(color="#64748b",width=2,dash="dot"),
                                  hovertemplate=paste0("واقعی: %{y:.1f}",unit,"<extra></extra>"))
       }
       
@@ -744,7 +860,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         if (nrow(om_future) > 0)
           p <- plotly::add_trace(p, type="scatter", mode="lines+markers",
                                  x=om_future$time, y=om_future[[om_var]], name="Open-Meteo (API)",
-                                 line=list(color="#22c55e", width=2, dash="dash"), marker=list(color="#22c55e", size=4, symbol="x"),
+                                 line=list(color="#22c55e", width=2, dash="dash"), marker=list(color="#22c55e", size=6, symbol="x"),
                                  hovertemplate=paste0("API: %{y:.1f}",unit,"<extra></extra>"))
       }
       
@@ -767,8 +883,8 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           p <- plotly::add_trace(p, type="scatter", mode="lines+markers",
                                  x=mlp$timestamps, y=m_data$preds,
                                  name=m_data$method,
-                                 line=list(color=m_data$color, width=2.5),
-                                 marker=list(color=m_data$color, size=5),
+                                 line=list(color=m_data$color, width=3),
+                                 marker=list(color=m_data$color, size=6),
                                  hovertemplate=paste0("%{x|%H:%M}<br>%{y:.1f}",unit,"<extra></extra>"))
         }
       }
@@ -783,17 +899,17 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       
       p <- p %>% plotly::layout(
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=list(family="Vazirmatn,Tahoma",color="#64748b",size=10),
-        xaxis=list(title="", gridcolor="rgba(99,143,232,.04)", tickfont=list(size=10,color="#64748b"),
+        font=list(family="Vazirmatn,Tahoma",color="#94a3b8",size=13),
+        xaxis=list(title="", gridcolor="rgba(99,143,232,.04)", tickfont=list(size=12,color="#94a3b8"),
                    tickformat="%H:%M", range=list(x_min, x_max), type="date", dtick=2*60*60*1000, ticklabelmode="instant"),
-        yaxis=list(title=unit, gridcolor="rgba(99,143,232,.05)", tickfont=list(size=10,color="#64748b"), ticksuffix=unit, range=y_range),
-        legend=list(orientation="h",y=-0.24,x=.5,xanchor="center", font=list(size=10),bgcolor="rgba(0,0,0,0)"),
-        hovermode="x unified", margin=list(l=42,r=8,t=4,b=48),
+        yaxis=list(title=unit, gridcolor="rgba(99,143,232,.05)", tickfont=list(size=12,color="#94a3b8"), ticksuffix=unit, range=y_range),
+        legend=list(orientation="h",y=-0.2,x=.5,xanchor="center", font=list(size=12),bgcolor="rgba(0,0,0,0)"),
+        hovermode="x unified", margin=list(l=45,r=10,t=5,b=50),
         shapes=list(list(type="line",xref="x",yref="paper", x0=now,x1=now,y0=0,y1=1, line=list(color="rgba(255,255,255,.12)",width=1,dash="dot"))),
         annotations = if (has_pred || show_om) {
-          list(list(x=now,y=1,xref="x",yref="paper", text="الان",showarrow=FALSE, font=list(color="rgba(255,255,255,.28)",size=10,family="Vazirmatn"), yanchor="bottom"))
+          list(list(x=now,y=1,xref="x",yref="paper", text="الان",showarrow=FALSE, font=list(color="rgba(255,255,255,.4)",size=12,family="Vazirmatn"), yanchor="bottom"))
         } else {
-          list(list(x=now,y=1,xref="x",yref="paper", text="الان",showarrow=FALSE, font=list(color="rgba(255,255,255,.28)",size=10,family="Vazirmatn"), yanchor="bottom"), list(x=0.5, y=0.5, xref="paper", yref="paper", showarrow=FALSE, text="روی «اجرای مدل» کلیک کنید", font=list(color="#64748b",size=12,family="Vazirmatn,Tahoma")))
+          list(list(x=now,y=1,xref="x",yref="paper", text="الان",showarrow=FALSE, font=list(color="rgba(255,255,255,.4)",size=12,family="Vazirmatn"), yanchor="bottom"), list(x=0.5, y=0.5, xref="paper", yref="paper", showarrow=FALSE, text="روی «اجرای مدل» کلیک کنید", font=list(color="#64748b",size=14,family="Vazirmatn,Tahoma")))
         }
       )
       p %>% plotly::config(displayModeBar=FALSE)
@@ -811,37 +927,27 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         m <- metrics[[mn]]
         r2_color <- ifelse(m$r2 > 0.85, "#22c55e", ifelse(m$r2 > 0.7, "#fbbf24", "#ef4444"))
         tags$tr(
-          tags$td(style="text-align:right; color:#e2e8f0; font-weight:700; padding:5px 0; border-bottom:1px solid rgba(99,143,232,0.1);", 
-                  MODEL_META[[mn]]$label),
-          tags$td(style=paste0("text-align:center; color:", r2_color, "; font-weight:900; padding:5px 0; border-bottom:1px solid rgba(99,143,232,0.1);"), 
-                  round(m$r2, 3)),
-          tags$td(style="text-align:center; color:#e2e8f0; font-weight:900; padding:5px 0; border-bottom:1px solid rgba(99,143,232,0.1);", 
-                  round(m$rmse, 2)),
-          tags$td(style="text-align:center; color:#e2e8f0; font-weight:900; padding:5px 0; border-bottom:1px solid rgba(99,143,232,0.1);", 
-                  round(m$mae, 2))
+          tags$td(MODEL_META[[mn]]$label),
+          tags$td(style=paste0("color:", r2_color, ";"), round(m$r2, 3)),
+          tags$td(round(m$rmse, 2)),
+          tags$td(round(m$mae, 2))
         )
       })
       
       tags$div(
-        class = "fc-ctrl-box", 
-        style = "padding:12px; margin-top:10px; font-size:11px; background:rgba(30,41,59,.6); border-radius:8px;",
-        tags$div(style="font-weight:700; color:#e2e8f0; margin-bottom:10px; display:flex; align-items:center; gap:6px;", 
-                 tags$i(class="fa fa-circle-check", style="color:#22c55e; font-size:10px;"), 
-                 "نتیجه ارزیابی (۲۴h گذشته)"),
-        tags$table(style="width:100%; border-collapse:collapse;",
+        class = "eval-container",
+        tags$div(class="eval-header", tags$i(class="fa fa-circle-check"), "نتیجه ارزیابی (۲۴h گذشته)"),
+        tags$table(class="eval-table",
                    tags$thead(
                      tags$tr(
-                       tags$th(style="text-align:right; color:#64748b; font-size:9px; font-weight:700; padding-bottom:6px;", "مدل"),
-                       tags$th(style="text-align:center; color:#64748b; font-size:9px; font-weight:700; padding-bottom:6px;", "R²"),
-                       tags$th(style="text-align:center; color:#64748b; font-size:9px; font-weight:700; padding-bottom:6px;", "RMSE"),
-                       tags$th(style="text-align:center; color:#64748b; font-size:9px; font-weight:700; padding-bottom:6px;", "MAE")
+                       tags$th("مدل"), tags$th("R²"), tags$th("RMSE"), tags$th("MAE")
                      )
                    ),
                    tags$tbody(rows)
         ),
-        tags$div(style="display:flex; justify-content:space-between; border-top:1px solid rgba(99,143,232,.1); padding-top:8px; margin-top:8px; color:#64748b; font-size:10px;",
-                 tags$span(tags$i(class="fa fa-bolt", style="margin-left:4px; color:#fbbf24;"), paste0("زمان اجرا: ", time_val, " ثانیه")),
-                 tags$span(tags$i(class="fa fa-clock", style="margin-left:4px; color:#60a5fa;"), "افق: ۲۴ ساعت")
+        tags$div(class="eval-footer",
+                 tags$span(tags$i(class="fa fa-bolt", style="color:#fbbf24;"), paste0("زمان اجرا: ", time_val, " ثانیه")),
+                 tags$span(tags$i(class="fa fa-clock", style="color:#60a5fa;"), "افق: ۲۴ ساعت")
         )
       )
     })
@@ -854,10 +960,9 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       tagList(
         tags$div(class="fc-chart-box",
                  tags$div(
-                   style="display:flex;align-items:center;gap:8px;margin-bottom:10px;",
-                   tags$i(class="fa fa-calendar-week",style="color:#fbbf24;font-size:11px;"),
-                   tags$span(style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;", "پیش‌بینی ۷ روز (مدل ML)"),
-                   tags$span(style="margin-right:auto;font-size:9px;color:#64748b;font-style:italic;", "انتخاب مدل برای نمایش")
+                   style="display:flex;align-items:center;gap:8px;margin-bottom:12px;",
+                   tags$i(class="fa fa-calendar-week",style="color:#fbbf24;font-size:14px;"),
+                   tags$span(class="fc-section-lbl", style="margin-bottom:0;", "پیش‌بینی ۷ روز (مدل ML)")
                  ),
                  uiOutput(ns("daily_model_selector")),
                  uiOutput(ns("week_mini")),
@@ -944,9 +1049,9 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
                    bwid_om <- max(6,round((as.numeric(r_om$max_val)-as.numeric(r_om$min_val))/rng*100,0))
                    tags$div(class="om-row",
                             tags$div(class="om-label", "Open-Meteo"),
-                            tags$div(class="wm-max", style="font-size:12px; color:#22c55e;", paste0(round(as.numeric(r_om$max_val),0),"°")),
-                            tags$div(class="wm-bar", style="margin:2px auto;", tags$div(class="wm-bar-fill", style=paste0("left:",blft_om,"%;width:",bwid_om,"%;background:#22c55e;"))),
-                            tags$div(class="wm-min", style="font-size:10px; color:#22c55e;", paste0(round(as.numeric(r_om$min_val),0),"°"))
+                            tags$div(class="wm-max", style="color:#22c55e;", paste0(round(as.numeric(r_om$max_val),0),"°")),
+                            tags$div(class="wm-bar", style="margin:3px auto;", tags$div(class="wm-bar-fill", style=paste0("left:",blft_om,"%;width:",bwid_om,"%;background:#22c55e;"))),
+                            tags$div(class="wm-min", style="color:#22c55e;", paste0(round(as.numeric(r_om$min_val),0),"°"))
                    )
                  }
         )
@@ -971,21 +1076,20 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       
       tags$div(
         class = "daily-comp-box",
-        tags$div(style="font-weight:700; color:#22c55e; margin-bottom:10px; display:flex; align-items:center; gap:6px;", 
-                 tags$i(class="fa fa-scale-balanced"), "مقایسه با Open-Meteo (۷ روز)"),
-        tags$table(style="width:100%; border-collapse:collapse;",
+        tags$div(class="daily-comp-header", tags$i(class="fa fa-scale-balanced"), "مقایسه با Open-Meteo (۷ روز)"),
+        tags$table(class="comp-table",
                    tags$tbody(
                      tags$tr(
-                       tags$td(style="text-align:right; color:#64748b; font-size:11px; padding:5px 0;", "میانگین اختلاف"),
-                       tags$td(style="text-align:center; font-weight:800; color:#e2e8f0; font-size:14px;", paste0(as.numeric(m$avg_diff), unit))
+                       tags$td("میانگین اختلاف"),
+                       tags$td(style="color:#e2e8f0;", paste0(as.numeric(m$avg_diff), unit))
                      ),
                      tags$tr(
-                       tags$td(style="text-align:right; color:#64748b; font-size:11px; padding:5px 0; border-top:1px solid rgba(255,255,255,0.05);", "کمترین اختلاف"),
-                       tags$td(style="text-align:center; font-weight:800; color:#22c55e; font-size:14px; border-top:1px solid rgba(255,255,255,0.05);", paste0(as.numeric(m$min_diff), unit))
+                       tags$td("کمترین اختلاف"),
+                       tags$td(style="color:#22c55e;", paste0(as.numeric(m$min_diff), unit))
                      ),
                      tags$tr(
-                       tags$td(style="text-align:right; color:#64748b; font-size:11px; padding:5px 0; border-top:1px solid rgba(255,255,255,0.05);", "بیشترین اختلاف"),
-                       tags$td(style="text-align:center; font-weight:800; color:#ef4444; font-size:14px; border-top:1px solid rgba(255,255,255,0.05);", paste0(as.numeric(m$max_diff), unit))
+                       tags$td("بیشترین اختلاف"),
+                       tags$td(style="color:#ef4444;", paste0(as.numeric(m$max_diff), unit))
                      )
                    )
         )
@@ -1022,10 +1126,9 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       tagList(
         tags$div(class="fc-chart-box",
                  tags$div(
-                   style="display:flex;align-items:center;gap:8px;margin-bottom:10px;",
-                   tags$i(class="fa fa-chart-simple", style="color:#22d3ee;font-size:11px;"),
-                   tags$span(style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;", "اهمیت ویژگی‌ها (Feature Importance)"),
-                   tags$span(style="margin-right:auto;font-size:9px;color:#64748b;font-style:italic;", "انتخاب مدل برای نمایش")
+                   style="display:flex;align-items:center;gap:8px;margin-bottom:12px;",
+                   tags$i(class="fa fa-chart-simple", style="color:#22d3ee;font-size:14px;"),
+                   tags$span(class="fc-section-lbl", style="margin-bottom:0;", "اهمیت ویژگی‌ها (Feature Importance)")
                  ),
                  tags$div(class = "daily-model-selector", pills),
                  plotly::plotlyOutput(ns("feat_imp_chart"), height = "280px")
@@ -1050,14 +1153,24 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       df <- df[order(df$Gain, decreasing = FALSE),]
       if (nrow(df) > 15) df <- tail(df, 15)
       
-      plotly::plot_ly(data = df, x = ~Gain, y = ~Feature, type = "bar", orientation = "h", marker = list(color = "#22d3ee", line = list(color = "rgba(0,0,0,0)", width = 0)), hovertemplate = "<b>%{y}</b><br>Gain: %{x:.4f}<extra></extra>") %>%
-        plotly::layout(paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)", font = list(family = "Vazirmatn,Tahoma", color = "#94a3b8", size = 11), xaxis = list(title = "اهمیت (Gain)", gridcolor = "rgba(99,143,232,0.06)", tickfont = list(size = 10, color = "#64748b")), yaxis = list(title = "", gridcolor = "transparent", tickfont = list(size = 11, color = "#94a3b8")), margin = list(l = 130, r = 20, t = 10, b = 30)) %>%
+      plotly::plot_ly(data = df, x = ~Gain, y = ~Feature, type = "bar", orientation = "h", 
+                      marker = list(color = "#22d3ee", line = list(color = "rgba(0,0,0,0)", width = 0)), 
+                      hovertemplate = "<b>%{y}</b><br>Gain: %{x:.4f}<extra></extra>") %>%
+        plotly::layout(paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)", 
+                       font = list(family = "Vazirmatn,Tahoma", color = "#94a3b8", size = 13), 
+                       xaxis = list(title = "اهمیت (Gain)", gridcolor = "rgba(99,143,232,0.06)", tickfont = list(size = 12, color = "#94a3b8")), 
+                       yaxis = list(title = "", gridcolor = "transparent", tickfont = list(size = 13, color = "#cbd5e1")), 
+                       margin = list(l = 130, r = 20, t = 10, b = 30)) %>%
         plotly::config(displayModeBar = FALSE)
     })
+    
     # ── Forecast Explainer (XAI) ──
     output$error_box <- renderUI({
       err <- last_error(); if(is.null(err)) return(NULL)
-      tags$div(style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);border-radius:8px;padding:9px 11px;margin-top:7px;", tags$div(style="font-size:11px;font-weight:700;color:#f87171;margin-bottom:4px;", tags$i(class="fa fa-triangle-exclamation",style="margin-left:4px;"),"خطا — ",err$time), tags$pre(style="background:rgba(0,0,0,.2);border-radius:4px;padding:6px;font-size:10px;color:#fca5a5;direction:ltr;text-align:left;white-space:pre-wrap;margin:0;", err$msg))
+      tags$div(style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);border-radius:8px;padding:10px 12px;margin-top:10px;", 
+               tags$div(style="font-size:13px;font-weight:700;color:#f87171;margin-bottom:6px;display:flex;align-items:center;gap:5px;", 
+                        tags$i(class="fa fa-triangle-exclamation"),"خطا — ", err$time), 
+               tags$pre(style="background:rgba(0,0,0,.2);border-radius:4px;padding:8px;font-size:12px;color:#fca5a5;direction:ltr;text-align:left;white-space:pre-wrap;margin:0;", err$msg))
     })
     
     observeEvent(input$run_model, {

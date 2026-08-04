@@ -1,4 +1,4 @@
-# File: modules/leaderboard_module.R  (نسخه کامل با UI)
+# File: modules/leaderboard_module.R  (نسخه کامل با UI + AutoML Ensemble)
 # ماژول رتبه‌بندی مدل‌ها — UI کامل + Server
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -169,7 +169,7 @@ leaderboardUI <- function(id) {
                       tags$div(class="lb-hero",
                                tags$div(class="badge",
                                         tags$i(class="fa fa-trophy"),
-                                        "Benchmark · ۱۲ مدل · مقایسه جامع"
+                                        "Benchmark · ۱۲ مدل · مقایسه جامع" # آپدیت به 12 مدل
                                ),
                                tags$h2("رتبه‌بندی مدل‌های پیش‌بینی"),
                                tags$p(
@@ -366,8 +366,9 @@ leaderboardServer <- function(id, weather_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", tbats="#0d9488", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", svm="#ef4444", naive="#64748b")
-    MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", tbats="TBATS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", svm="SVM", naive="Naïve")
+    # افزودن ensemble به لیست رنگ‌ها و نام مدل‌ها
+    MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", tbats="#0d9488", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", svm="#ef4444", naive="#64748b", ensemble="#22c55e")
+    MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", tbats="TBATS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", svm="SVM", naive="Naïve", ensemble="AutoML Ensemble")
     ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
     
     observe({
@@ -396,20 +397,23 @@ leaderboardServer <- function(id, weather_data) {
           test_vals <- test_df[[target]]
           test_h <- nrow(test_df)
           
-          # CatBoost اضافه شد
+          # 11 مدل پایه
           model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive")
           
           all_metrics <- list()
           all_speed <- list()
+          all_preds_list <- list() # برای ساخت انسمبل
           
-          window_rmses <- matrix(NA_real_, nrow=length(model_names), ncol=3)
-          rownames(window_rmses) <- model_names
+          # اضافه کردن ردیف برای انسمبل در ماتریس پایداری
+          window_rmses <- matrix(NA_real_, nrow=length(model_names)+1, ncol=3)
+          rownames(window_rmses) <- c(model_names, "ensemble")
           
           window_size <- floor(test_h / 3)
           
+          # ── ۱. ارزیابی مدل‌های پایه ──
           for (i in seq_along(model_names)) {
             mn <- model_names[i]
-            setProgress((i-1)/length(model_names), paste("آموزش:", MODEL_LABELS[[mn]]))
+            setProgress((i-1)/(length(model_names)+1), paste("آموزش:", MODEL_LABELS[[mn]]))
             
             t_start <- Sys.time()
             fc <- tryCatch(
@@ -430,6 +434,11 @@ leaderboardServer <- function(id, weather_data) {
               all_metrics[[mn]] <- m
               all_speed[[mn]] <- tibble::tibble(model_id = mn, exec_time = round(exec_time, 3))
               
+              # پد کردن پیش‌بینی‌ها برای انسمبل
+              preds_padded <- rep(NA_real_, test_h)
+              preds_padded[seq_along(preds)] <- as.numeric(preds)
+              all_preds_list[[mn]] <- preds_padded
+              
               for(w in 1:3) {
                 start_idx <- (w-1)*window_size + 1
                 end_idx <- if(w==3) test_h else (w*window_size)
@@ -441,6 +450,58 @@ leaderboardServer <- function(id, weather_data) {
             } else {
               all_metrics[[mn]] <- tibble::tibble(model=mn, RMSE=NA_real_, MAE=NA_real_, MAPE=NA_real_, R2=NA_real_, SMAPE=NA_real_)
               all_speed[[mn]] <- tibble::tibble(model_id=mn, exec_time=NA_real_)
+            }
+          }
+          
+          # ── ۲. محاسبه انسمبل هوشمند (Softmax Ensemble) ──
+          setProgress(0.95, "ساخت مدل ترکیبی (Ensemble)")
+          if (length(all_preds_list) >= 2) {
+            # محاسبه RMSE برای مدل‌های موفق
+            ens_rmses <- sapply(names(all_preds_list), function(mn) {
+              p <- as.numeric(all_preds_list[[mn]])
+              a <- as.numeric(test_vals)
+              valid <- !is.na(a) & !is.na(p)
+              if(sum(valid) < 2) return(NA)
+              sqrt(mean((a[valid] - p[valid])^2))
+            })
+            ens_rmses <- ens_rmses[!is.na(ens_rmses)]
+            
+            if(length(ens_rmses) >= 2) {
+              # فیلتر مدل‌های ضعیف
+              min_rmse <- min(ens_rmses)
+              strong_models <- names(ens_rmses)[ens_rmses <= (min_rmse * 1.5)]
+              if (length(strong_models) >= 2) {
+                valid_models <- strong_models
+              } else {
+                valid_models <- names(ens_rmses)
+              }
+              
+              # وزن‌دهی Softmax
+              beta <- 5
+              exp_vals <- exp(-beta * ens_rmses[valid_models])
+              weights <- exp_vals / sum(exp_vals)
+              
+              # ترکیب پیش‌بینی‌ها
+              ens_preds <- rowSums(sapply(valid_models, function(mn) as.numeric(all_preds_list[[mn]]) * weights[mn]), na.rm=TRUE)
+              ens_actual <- as.numeric(test_vals)
+              
+              # متریک‌های انسمبل
+              m_ens <- compute_all_metrics(ens_actual, ens_preds, model_name="ensemble")
+              all_metrics[["ensemble"]] <- m_ens
+              
+              # زمان اجرای انسمبل (مجموع مدل‌های پایه)
+              ens_time <- sum(sapply(valid_models, function(mn) all_speed[[mn]]$exec_time), na.rm=TRUE)
+              all_speed[["ensemble"]] <- tibble::tibble(model_id="ensemble", exec_time=round(ens_time, 3))
+              
+              # پنجره‌های پایداری برای انسمبل
+              for(w in 1:3) {
+                start_idx <- (w-1)*window_size + 1
+                end_idx <- if(w==3) test_h else (w*window_size)
+                w_actual <- ens_actual[start_idx:end_idx]
+                w_preds <- ens_preds[start_idx:end_idx]
+                w_rmse <- sqrt(mean((w_actual - w_preds)^2, na.rm=TRUE))
+                window_rmses["ensemble", w] <- w_rmse
+              }
             }
           }
           
@@ -467,7 +528,7 @@ leaderboardServer <- function(id, weather_data) {
             metrics = ranked,
             speed = speed_df,
             stability = stability_df,
-            info = list(n_models = length(model_names), test_size = test_h, exec_time = total_time, station = STATIONS[[sid]]$name, target = target)
+            info = list(n_models = length(ranked$model), test_size = test_h, exec_time = total_time, station = STATIONS[[sid]]$name, target = target)
           ))
           
           setProgress(1, "Benchmark کامل شد!")
@@ -485,7 +546,7 @@ leaderboardServer <- function(id, weather_data) {
       req(weather_data(), input$target_var)
       target <- input$target_var
       stations <- names(weather_data())
-      model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive")
+      model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive", "ensemble")
       
       withProgress(message="در حال اجرای بنچمارک منطقه‌ای (ایستگاه‌ها)...", value=0, {
         res_matrix <- matrix(NA_real_, nrow=length(model_names), ncol=length(stations))
@@ -497,18 +558,54 @@ leaderboardServer <- function(id, weather_data) {
           df <- weather_data()[[sid]] %>% dplyr::filter(!is.na(.data[[target]]))
           if (nrow(df) < 60) next
           splits <- train_test_split(df, test_ratio=0.15)
+          test_h_reg <- nrow(splits$test)
+          station_preds <- list()
           
           for(j in seq_along(model_names)) {
             mn <- model_names[j]
+            
+            # محاسبه انسمبل برای ایستگاه
+            if (mn == "ensemble") {
+              if (length(station_preds) >= 2) {
+                ens_rmses <- sapply(names(station_preds), function(mn2) {
+                  p <- as.numeric(station_preds[[mn2]])
+                  a <- as.numeric(splits$test[[target]])
+                  valid <- !is.na(a) & !is.na(p)
+                  if(sum(valid) < 2) return(NA)
+                  sqrt(mean((a[valid] - p[valid])^2))
+                })
+                ens_rmses <- ens_rmses[!is.na(ens_rmses)]
+                if(length(ens_rmses) >= 2) {
+                  min_r <- min(ens_rmses)
+                  strong <- names(ens_rmses)[ens_rmses <= (min_r * 1.5)]
+                  if (length(strong) >= 2) valid_m <- strong else valid_m <- names(ens_rmses)
+                  
+                  beta <- 5
+                  w <- exp(-beta * ens_rmses[valid_m]) / sum(exp(-beta * ens_rmses[valid_m]))
+                  ens_p <- rowSums(sapply(valid_m, function(mn2) as.numeric(station_preds[[mn2]]) * w[mn2]), na.rm=TRUE)
+                  
+                  m <- compute_all_metrics(as.numeric(splits$test[[target]]), ens_p, model_name="ensemble")
+                  res_matrix["ensemble", i] <- m$RMSE
+                }
+              }
+              next
+            }
+            
+            # اجرای مدل‌های پایه
             fc <- tryCatch(
-              run_model_by_name(mn, splits$train, nrow(splits$test), target),
+              run_model_by_name(mn, splits$train, test_h_reg, target),
               error = function(e) NULL
             )
             if(!is.null(fc) && !is.null(fc$predictions) && length(fc$predictions) > 0) {
-              preds <- fc$predictions[seq_len(min(nrow(splits$test), length(fc$predictions)))]
+              preds <- fc$predictions[seq_len(min(test_h_reg, length(fc$predictions)))]
               actual <- splits$test[[target]][seq_len(length(preds))]
               m <- compute_all_metrics(actual, preds, model_name=mn)
-              res_matrix[j, i] <- m$RMSE
+              res_matrix[mn, i] <- m$RMSE
+              
+              # ذخیره برای انسمبل
+              preds_padded <- rep(NA_real_, test_h_reg)
+              preds_padded[seq_along(preds)] <- as.numeric(preds)
+              station_preds[[mn]] <- preds_padded
             }
           }
           setProgress(i/length(stations))
@@ -639,10 +736,11 @@ leaderboardServer <- function(id, weather_data) {
       speed_df <- benchmark_data()$speed
       merged <- dplyr::inner_join(metrics_df, speed_df, by = c("model" = "model_id"))
       merged$model_label <- sapply(merged$model, function(m) MODEL_LABELS[[m]])
-      merged$type <- ifelse(merged$model %in% ML_MODELS, "ML", "Statistical")
+      # دسته‌بندی برای رنگ‌بندی در نمودار
+      merged$type <- ifelse(merged$model == "ensemble", "Ensemble", ifelse(merged$model %in% ML_MODELS, "ML", "Statistical"))
       
       plotly::plot_ly(merged, x = ~exec_time, y = ~RMSE, type = "scatter", mode = "markers",
-                      color = ~type, colors = c("ML" = "#f59e0b", "Statistical" = "#3b82f6"),
+                      color = ~type, colors = c("Ensemble" = "#22c55e", "ML" = "#f59e0b", "Statistical" = "#3b82f6"),
                       marker = list(size = 18, opacity = 0.8,
                                     line = list(width = 1, color = "rgba(255,255,255,0.5)")),
                       text = ~model_label,

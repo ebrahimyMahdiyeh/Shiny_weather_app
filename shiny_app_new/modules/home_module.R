@@ -160,8 +160,8 @@ homeUI <- function(id) {
           ),
           tags$div(
             class = "formula-box",
-            style = "font-size:10px;margin:4px 0;",
-            "ŷ = Σ(w_i × ŷ_i)   |   w_i = (1/score_i) / Σ(1/score_j)"
+            style = "font-size:12px;margin:4px 0;",
+            "ŷ = Σ(w_i × ŷ_i)   |   w_i = exp(-β × RMSE_i) / Σ exp(-β × RMSE_j)"
           ),
           tags$div(style="font-size:11px;color:#94a3b8;",
                    "ترکیب وزن‌دار بهترین مدل‌ها بر اساس نمره ترکیبی"
