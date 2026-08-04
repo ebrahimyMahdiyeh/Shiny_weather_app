@@ -87,7 +87,7 @@ Recommended model: **Random Forest** (overall score 9.9/10 — lowest error, hig
 The AutoML ensemble blends every model's forecast, weighted by inverse error, so more accurate models get proportionally more say in the final prediction:
 
 ```
-ŷ = Σ(w_i × ŷ_i),   where w_i = (1/score_i) / Σ(1/score_j)
+ŷ = Σ(w_i × ŷ_i)   |   w_i = exp(-β × RMSE_i) / Σ exp(-β × RMSE_j)
 ```
 
 ---
