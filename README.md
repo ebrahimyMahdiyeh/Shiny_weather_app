@@ -22,27 +22,9 @@ An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statis
 ##  Screenshots
 
 <p align="center">
-  <img src="images/overview.png" alt="Overview page" width="800"><br>
-  <sub>Overview — dataset stats, historical trends, and methodology</sub>
+  <img src="images/overview.gif" alt="Overview page" width="800"><br>
+  <sub>Overview of dashboard</sub>
 </p>
-<p align="center">
-  <img src="images/forecast.png" alt="Weather forecast page" width="800"><br>
-  <sub>Weather Forecast — live conditions, hourly chart, 7-day outlook</sub>
-</p>
-<p align="center">
-  <img src="images/leaderboard.png" alt="Model benchmark leaderboard" width="800"><br>
-  <sub>Model leaderboard</sub>
-</p>
-<p align="center">
-  <img src="images/heatmap.png" alt="Model heatmap" width="800"><br>
-  <sub>Model heatmap for each region</sub>
-</p>
-<p align="center">
-  <img src="images/anomaly.png" alt="model anomaly" width="800"><br>
-  <sub>Model anomaly analysis</sub>
-</p>
-
-
 ---
 
 ##  Features
@@ -105,7 +87,7 @@ Recommended model: **Random Forest** (overall score 9.9/10 — lowest error, hig
 The AutoML ensemble blends every model's forecast, weighted by inverse error, so more accurate models get proportionally more say in the final prediction:
 
 ```
-ŷ = Σ(w_i × ŷ_i),   where w_i = (1/score_i) / Σ(1/score_j)
+ŷ = Σ(w_i × ŷ_i)   |   w_i = exp(-β × RMSE_i) / Σ exp(-β × RMSE_j)
 ```
 
 ---
