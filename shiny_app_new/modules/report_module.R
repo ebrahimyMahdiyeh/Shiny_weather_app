@@ -1,5 +1,5 @@
 # File: modules/report_module.R
-# ماژول گزارش — خروجی Excel و PDF
+# ماژول گزارش — خروجی Excel و HTML
 
 # ── UI ───────────────────────────────────────────────────────────────────────
 reportUI <- function(id) {
@@ -7,122 +7,56 @@ reportUI <- function(id) {
   tagList(
     fluidRow(
       column(4,
-             box(
-               title       = "تنظیمات گزارش",
-               width       = 12,
-               status      = "info",
-               solidHeader = TRUE,
-               selectInput(ns("report_station"),
-                           label   = "ایستگاه:",
-                           choices = NULL
-               ),
-               textInput(ns("report_title"),
-                         label = "عنوان گزارش:",
-                         value = "گزارش تحلیل آب‌وهوا"
-               ),
-               textInput(ns("analyst_name"),
-                         label = "نام تحلیلگر:",
-                         value = "سیستم خودکار"
-               ),
-               dateRangeInput(ns("report_date_range"),
-                              label     = "بازه زمانی:",
-                              start     = Sys.Date() - 365,
-                              end       = Sys.Date() - 1,
-                              language  = "fa"
-               ),
+             shinydashboard::box(
+               title = tags$span(tags$i(class="fa fa-sliders", style="margin-left:6px;color:var(--blue2);"), "تنظیمات گزارش"),
+               width = 12, solidHeader = FALSE, status = "primary",
+               
+               selectInput(ns("report_station"), label = "ایستگاه:", choices = NULL),
+               textInput(ns("report_title"), label = "عنوان گزارش:", value = "گزارش تحلیل آب‌وهوا"),
+               textInput(ns("analyst_name"), label = "نام تحلیلگر:", value = "سیستم خودکار"),
+               dateRangeInput(ns("report_date_range"), label = "بازه زمانی:", start = Sys.Date() - 365, end = Sys.Date() - 1, language = "fa"),
                hr(),
                
-               tags$h5(tags$i(class="fa fa-list-check", style="margin-left:6px;color:#60a5fa;"), "محتوای گزارش"),
+               tags$h5(tags$i(class="fa fa-list-check", style="margin-left:6px;color:var(--blue2);"), "محتوای گزارش"),
                
                fluidRow(
-                 column(6,
-                        tags$div(class="mv-box compare-box",
-                                 checkboxInput(ns("include_forecast"), label = "پیش‌بینی", value = TRUE, width = "100%")
-                        )
-                 ),
-                 column(6,
-                        tags$div(class="mv-box compare-box",
-                                 checkboxInput(ns("include_metrics"), label = "معیارهای ارزیابی", value = TRUE, width = "100%")
-                        )
-                 ),
-                 column(6,
-                        tags$div(class="mv-box compare-box",
-                                 checkboxInput(ns("include_anomalies"), label = "ناهنجاری‌ها", value = TRUE, width = "100%")
-                        )
-                 ),
-                 column(6,
-                        tags$div(class="mv-box compare-box",
-                                 checkboxInput(ns("include_leaderboard"), label = "رتبه‌بندی مدل‌ها", value = TRUE, width = "100%")
-                        )
-                 )
+                 column(6, tags$div(class="mv-box compare-box", checkboxInput(ns("include_forecast"), label = "پیش‌بینی", value = TRUE, width = "100%"))),
+                 column(6, tags$div(class="mv-box compare-box", checkboxInput(ns("include_metrics"), label = "معیارهای ارزیابی", value = TRUE, width = "100%"))),
+                 column(6, tags$div(class="mv-box compare-box", checkboxInput(ns("include_anomalies"), label = "ناهنجاری‌ها", value = TRUE, width = "100%"))),
+                 column(6, tags$div(class="mv-box compare-box", checkboxInput(ns("include_leaderboard"), label = "رتبه‌بندی مدل‌ها", value = TRUE, width = "100%")))
                )
-               )
+             )
       ),
       
       column(8,
-             # پیش‌نمایش و دانلود
-             box(
-               title       = "دانلود گزارش",
-               width       = 12,
-               status      = "primary",
-               solidHeader = TRUE,
-               tags$p(style="font-size:11.5px;color:var(--text3);margin:-4px 0 12px;",
-                      "سه قالب خروجی: Excel برای تحلیل داده‌محور، PDF برای گزارش رسمی (نیازمند LaTeX)، و HTML برای اشتراک‌گذاری سریع بدون نیاز به نصب."),
+             shinydashboard::box(
+               title = tags$span(tags$i(class="fa fa-download", style="margin-left:6px;color:#22c55e;"), "دانلود گزارش"),
+               width = 12, solidHeader = FALSE, status = "success",
+               tags$p(style="font-size:14px;color:var(--text3);margin:-4px 0 12px;",
+                      "دو قالب خروجی: Excel برای تحلیل داده‌محور، و HTML برای اشتراک‌گذاری سریع و مشاهده در مرورگر بدون نیاز به نصب هیچ نرم‌افزاری."),
                fluidRow(
-                 column(4,
-                        div(
-                          class = "report-dl-card",
-                          icon("file-excel", class = "dl-icon", style = "color:#1D6F42;"),
-                          tags$div(class = "dl-title", "گزارش Excel"),
-                          tags$p(class = "dl-desc",
-                                 "صفحات: خلاصه، داده تاریخی، پیش‌بینی، ناهنجاری‌ها، رتبه‌بندی"
-                          ),
-                          downloadButton(
-                            ns("download_excel"),
-                            label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "Excel"),
-                            class = "btn-success"
-                          )
+                 column(6,
+                        div(class = "report-dl-card",
+                            icon("file-excel", class = "dl-icon", style = "color:#1D6F42;"),
+                            tags$div(class = "dl-title", "گزارش Excel"),
+                            tags$p(class = "dl-desc", "صفحات: خلاصه، داده تاریخی، پیش‌بینی، ناهنجاری‌ها، رتبه‌بندی"),
+                            downloadButton(ns("download_excel"), label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "Excel"), class = "btn-success")
                         )
                  ),
-                 column(4,
-                        div(
-                          class = "report-dl-card",
-                          icon("file-pdf", class = "dl-icon", style = "color:#dc3545;"),
-                          tags$div(class = "dl-title", "گزارش PDF"),
-                          tags$p(class = "dl-desc",
-                                 "خلاصه اجرایی + آمار توصیفی + جداول عملکرد"
-                          ),
-                          downloadButton(
-                            ns("download_pdf"),
-                            label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "PDF"),
-                            class = "btn-danger"
-                          )
-                        )
-                 ),
-                 column(4,
-                        div(
-                          class = "report-dl-card",
-                          icon("file-code", class = "dl-icon", style = "color:#3b82f6;"),
-                          tags$div(class = "dl-title", "گزارش HTML"),
-                          tags$p(class = "dl-desc",
-                                 "خودکار و همیشه قابل‌اعتماد — بدون نیاز به LaTeX"
-                          ),
-                          downloadButton(
-                            ns("download_html"),
-                            label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "HTML"),
-                            class = "btn-primary"
-                          )
+                 column(6,
+                        div(class = "report-dl-card",
+                            icon("file-code", class = "dl-icon", style = "color:#3b82f6;"),
+                            tags$div(class = "dl-title", "گزارش HTML"),
+                            tags$p(class = "dl-desc", "خودکار و همیشه قابل‌اعتماد — قابل چاپ و اشتراک‌گذاری در مرورگر"),
+                            downloadButton(ns("download_html"), label = tags$span(tags$i(class="fa fa-download", style="margin-left:5px;"), "HTML"), class = "btn-primary")
                         )
                  )
                )
              ),
              
-             # پیش‌نمایش آمار برای گزارش
-             box(
-               title       = "پیش‌نمایش داده گزارش",
-               width       = 12,
-               status      = "info",
-               solidHeader = TRUE,
+             shinydashboard::box(
+               title = tags$span(tags$i(class="fa fa-eye", style="margin-left:6px;color:#fbbf24;"), "پیش‌نمایش داده گزارش"),
+               width = 12, solidHeader = FALSE, status = "warning",
                collapsible = TRUE,
                uiOutput(ns("report_preview"))
              )
@@ -132,41 +66,30 @@ reportUI <- function(id) {
 }
 
 # ── Server ───────────────────────────────────────────────────────────────────
-reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
-                         leaderboard_rv) {
+reportServer <- function(id, weather_data, forecast_rv, anomaly_rv, leaderboard_rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    # تنظیم ایستگاه‌ها
     observe({
       req(weather_data())
-      choices <- purrr::imap_chr(weather_data(), function(df, sid) sid) %>%
-        purrr::set_names(purrr::imap_chr(weather_data(), function(df, sid) {
-          STATIONS[[sid]]$name %||% sid
-        }))
+      choices <- purrr::set_names(names(weather_data()), purrr::map_chr(names(weather_data()), ~ STATIONS[[.x]]$name %||% .x))
       updateSelectInput(session, "report_station", choices = choices)
     })
     
-    # ── آماده‌سازی داده گزارش ────────────────────────────────────────────────
     report_data <- reactive({
       req(input$report_station, weather_data())
       sid <- input$report_station
       req(sid %in% names(weather_data()))
       df <- weather_data()[[sid]]
       
-      # فیلتر بازه زمانی
       date_range <- input$report_date_range
       if (!is.null(date_range)) {
-        df <- df %>%
-          dplyr::filter(date >= date_range[1] & date <= date_range[2])
+        df <- df %>% dplyr::filter(date >= date_range[1] & date <= date_range[2])
       }
       
-      # آمار خلاصه
       summary_df <- tibble::tibble(
-        "معیار"   = c("تعداد روز", "میانگین دما", "حداقل دما",
-                      "حداکثر دما", "میانگین رطوبت",
-                      "کل بارش", "میانگین سرعت باد"),
-        "مقدار"   = c(
+        "معیار" = c("تعداد روز", "میانگین دما", "حداقل دما", "حداکثر دما", "میانگین رطوبت", "کل بارش", "میانگین سرعت باد"),
+        "مقدار" = c(
           nrow(df),
           round(mean(df$temperature, na.rm = TRUE), 1),
           round(min(df$temperature, na.rm = TRUE), 1),
@@ -177,13 +100,7 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
         )
       )
       
-      list(
-        station      = sid,
-        station_name = STATIONS[[sid]]$name %||% sid,
-        df           = df,
-        summary      = summary_df,
-        date_range   = date_range
-      )
+      list(station = sid, station_name = STATIONS[[sid]]$name %||% sid, df = df, summary = summary_df, date_range = date_range)
     })
     
     # ── پیش‌نمایش ────────────────────────────────────────────────────────────
@@ -191,27 +108,26 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
       req(report_data())
       rd <- report_data()
       tagList(
-        tags$h5(paste("ایستگاه:", rd$station_name)),
-        tags$p(paste("بازه:", rd$date_range[1], "تا", rd$date_range[2])),
-        tags$p(paste("تعداد روز:", nrow(rd$df))),
+        tags$h5(style="color:var(--text);", paste("ایستگاه:", rd$station_name)),
+        tags$p(style="color:var(--text2);", paste("بازه:", rd$date_range[1], "تا", rd$date_range[2])),
+        tags$p(style="color:var(--text2);", paste("تعداد روز:", nrow(rd$df))),
         hr(),
-        DT::renderDT({
-          DT::datatable(
-            rd$summary,
-            options  = list(dom = "t", pageLength = 10),
-            rownames = FALSE,
-            class    = "cell-border stripe"
-          )
-        })
+        DT::DTOutput(ns("preview_table"))
+      )
+    })
+    
+    output$preview_table <- DT::renderDT({
+      req(report_data())
+      DT::datatable(
+        report_data()$summary,
+        options = list(dom = "t", pageLength = 10),
+        rownames = FALSE, class = "cell-border stripe"
       )
     })
     
     # ── دانلود Excel ──────────────────────────────────────────────────────────
     output$download_excel <- downloadHandler(
-      filename = function() {
-        paste0("weather_report_",
-               format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
-      },
+      filename = function() { paste0("weather_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx") },
       content = function(file) {
         req(report_data())
         rd <- report_data()
@@ -219,271 +135,107 @@ reportServer <- function(id, weather_data, forecast_rv, anomaly_rv,
         tryCatch({
           wb <- openxlsx::createWorkbook()
           
-          # ── صفحه ۱: خلاصه آماری ─────────────────────────────────────────
           openxlsx::addWorksheet(wb, "خلاصه آماری")
-          openxlsx::writeData(wb, "خلاصه آماری",
-                              x        = input$report_title,
-                              startRow = 1, startCol = 1
-          )
-          openxlsx::addStyle(wb, "خلاصه آماری",
-                             style = openxlsx::createStyle(
-                               fontSize   = 14,
-                               fontColour = "#FFFFFF",
-                               fgFill     = COLORS$primary,
-                               halign     = "center",
-                               bold       = TRUE
-                             ),
-                             rows = 1, cols = 1:2, gridExpand = TRUE
-          )
+          openxlsx::writeData(wb, "خلاصه آماری", x = input$report_title, startRow = 1, startCol = 1)
+          openxlsx::addStyle(wb, "خلاصه آماری", style = openxlsx::createStyle(fontSize = 14, fontColour = "#FFFFFF", fgFill = "#3b82f6", halign = "center", bold = TRUE), rows = 1, cols = 1:2, gridExpand = TRUE)
           openxlsx::mergeCells(wb, "خلاصه آماری", rows = 1, cols = 1:2)
           
           meta_df <- data.frame(
             "گزارش" = c("ایستگاه", "بازه زمانی", "تهیه‌کننده", "تاریخ تولید"),
-            "جزئیات" = c(rd$station_name,
-                         paste(rd$date_range[1], "تا", rd$date_range[2]),
-                         input$analyst_name,
-                         format(Sys.Date(), "%Y-%m-%d")),
+            "جزئیات" = c(rd$station_name, paste(rd$date_range[1], "تا", rd$date_range[2]), input$analyst_name, format(Sys.Date(), "%Y-%m-%d")),
             check.names = FALSE
           )
           openxlsx::writeData(wb, "خلاصه آماری", x = meta_df, startRow = 3)
-          openxlsx::addStyle(wb, "خلاصه آماری",
-                             style = openxlsx::createStyle(textDecoration = "bold", fgFill = "#e8eef7"),
-                             rows = 3:6, cols = 1, gridExpand = TRUE
-          )
+          openxlsx::writeData(wb, "خلاصه آماری", x = rd$summary, startRow = 9)
           
-          openxlsx::writeData(wb, "خلاصه آماری",
-                              x        = rd$summary,
-                              startRow = 9
-          )
-          openxlsx::addStyle(wb, "خلاصه آماری",
-                             style = openxlsx::createStyle(
-                               fontSize = 11, fontColour = "#FFFFFF",
-                               fgFill = COLORS$primary, halign = "right", bold = TRUE
-                             ),
-                             rows = 9, cols = 1:2, gridExpand = TRUE
-          )
-          
-          # ── صفحه ۲: داده خام ───────────────────────────────────────────
           openxlsx::addWorksheet(wb, "داده تاریخی")
-          openxlsx::writeDataTable(
-            wb, "داده تاریخی",
-            x         = rd$df,
-            tableName = "HistoricalData"
-          )
+          openxlsx::writeDataTable(wb, "داده تاریخی", x = rd$df, tableName = "HistoricalData")
           
-          # ── صفحه ۳: پیش‌بینی ───────────────────────────────────────────
           if (isTRUE(input$include_forecast) && !is.null(forecast_rv())) {
-            openxlsx::addWorksheet(wb, "پیش‌بینی")
-            fr       <- forecast_rv()
-            last_d   <- max(fr$df$date)
-            fc_dates <- seq.Date(last_d + 1, by = "day", length.out = fr$horizon)
-            fc_df    <- tibble::tibble(
-              date        = fc_dates,
-              prediction  = round(fr$fc$predictions[seq_len(fr$horizon)], 2),
-              lower_95    = if (!is.null(fr$fc$lower))
-                round(fr$fc$lower[seq_len(fr$horizon)], 2) else NA,
-              upper_95    = if (!is.null(fr$fc$upper))
-                round(fr$fc$upper[seq_len(fr$horizon)], 2) else NA,
-              model       = fr$fc$method
-            )
-            openxlsx::writeDataTable(wb, "پیش‌بینی", x = fc_df, tableName = "Forecast")
+            fr <- forecast_rv()
+            openxlsx::addWorksheet(wb, "پیش‌بینی ۲۴ ساعت")
+            fc_df <- tibble::tibble(timestamp = fr$timestamps)
+            for (m_name in names(fr$preds_list)) {
+              m_data <- fr$preds_list[[m_name]]
+              fc_df[[m_data$method]] <- as.numeric(m_data$preds)
+            }
+            openxlsx::writeDataTable(wb, "پیش‌بینی ۲۴ ساعت", x = fc_df, tableName = "Forecast24h")
+            
+            if (length(fr$daily_preds) > 0) {
+              openxlsx::addWorksheet(wb, "پیش‌بینی ۷ روز")
+              daily_df <- tibble::tibble(date = fr$daily_preds[[1]]$date)
+              for (m_name in names(fr$daily_preds)) {
+                m_daily <- fr$daily_preds[[m_name]]
+                daily_df[[paste0(m_name, "_max")]] <- m_daily$max_val
+                daily_df[[paste0(m_name, "_min")]] <- m_daily$min_val
+              }
+              openxlsx::writeDataTable(wb, "پیش‌بینی ۷ روز", x = daily_df, tableName = "Forecast7d")
+            }
           }
           
-          # ── صفحه ۴: ناهنجاری‌ها ────────────────────────────────────────
           if (isTRUE(input$include_anomalies) && !is.null(anomaly_rv())) {
             openxlsx::addWorksheet(wb, "ناهنجاری‌ها")
-            anom_df <- anomaly_rv() %>%
-              dplyr::filter(is_anomaly) %>%
-              dplyr::select(date, temperature, anomaly_score, method)
-            openxlsx::writeDataTable(
-              wb, "ناهنجاری‌ها",
-              x         = anom_df,
-              tableName = "Anomalies"
-            )
+            anom_df <- anomaly_rv() %>% dplyr::filter(is_anomaly) %>% dplyr::select(date, temperature, anomaly_score, method)
+            openxlsx::writeDataTable(wb, "ناهنجاری‌ها", x = anom_df, tableName = "Anomalies")
           }
           
-          # ── صفحه ۵: تابلوی رتبه‌بندی ────────────────────────────────────
           if (isTRUE(input$include_leaderboard) && !is.null(leaderboard_rv())) {
             openxlsx::addWorksheet(wb, "رتبه‌بندی مدل‌ها")
-            openxlsx::writeDataTable(
-              wb, "رتبه‌بندی مدل‌ها",
-              x         = leaderboard_rv(),
-              tableName = "Leaderboard"
-            )
+            lb_df <- leaderboard_rv()$metrics
+            openxlsx::writeDataTable(wb, "رتبه‌بندی مدل‌ها", x = lb_df, tableName = "Leaderboard")
           }
           
           for (sname in openxlsx::sheets(wb)) {
-            openxlsx::setColWidths(wb, sname, cols = 1:10, widths = "auto")
+            openxlsx::setColWidths(wb, sname, cols = 1:15, widths = "auto")
           }
           
           openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
           showNotification("فایل Excel آماده شد.", type = "message")
           
         }, error = function(e) {
-          showNotification(paste("خطا در ساخت Excel:", e$message),
-                           type = "error", duration = 15)
-        })
-      }
-    )
-    
-    # ── دانلود PDF ────────────────────────────────────────────────────────────
-    output$download_pdf <- downloadHandler(
-      filename = function() {
-        paste0("weather_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")
-      },
-      content = function(file) {
-        req(report_data())
-        rd <- report_data()
-        
-        tryCatch({
-          tmp_rmd <- tempfile(fileext = ".Rmd")
-          
-          fc_text   <- ""
-          lb_text   <- ""
-          anom_text <- ""
-          
-          if (isTRUE(input$include_forecast) && !is.null(forecast_rv())) {
-            fr <- forecast_rv()
-            fc_text <- paste0(
-              "## پیش‌بینی\n",
-              "مدل مورد استفاده: **", fr$fc$method, "**\n\n",
-              "افق پیش‌بینی: **", fr$horizon, " روز**\n\n",
-              "میانگین پیش‌بینی: **", round(mean(fr$fc$predictions, na.rm = TRUE), 2), "**\n"
-            )
-          }
-          
-          if (isTRUE(input$include_leaderboard) && !is.null(leaderboard_rv())) {
-            lb  <- leaderboard_rv()
-            best <- lb[1, ]
-            lb_text <- paste0(
-              "## عملکرد مدل‌ها\n",
-              "بهترین مدل: **", best$model, "**\n\n",
-              "RMSE: **", round(best$RMSE, 3), "** | ",
-              "MAE: **",  round(best$MAE, 3),  "** | ",
-              "R²: **",  round(best$R2, 3),   "**\n"
-            )
-          }
-          
-          if (isTRUE(input$include_anomalies) && !is.null(anomaly_rv())) {
-            anom <- anomaly_rv()
-            n_a  <- sum(anom$is_anomaly, na.rm = TRUE)
-            anom_text <- paste0(
-              "## ناهنجاری‌ها\n",
-              "تعداد ناهنجاری‌های شناسایی‌شده: **", n_a, "**\n\n",
-              "روش: **", if (nrow(anom) > 0) anom$method[1] else "نامشخص", "**\n"
-            )
-          }
-          
-          # ساخت فایل Rmd به صورت خط به خط برای جلوگیری از خطای پارسر R
-          rmd_content <- paste0(
-            '---\n',
-            'title: "', input$report_title, '"\n',
-            'subtitle: "ایستگاه: ', rd$station_name, '"\n',
-            'author: "', input$analyst_name, '"\n',
-            'date: "', format(Sys.Date(), "%Y-%m-%d"), '"\n',
-            'output:\n',
-            '  pdf_document:\n',
-            '    latex_engine: xelatex\n',
-            '    toc: true\n',
-            '    number_sections: true\n',
-            'header-includes:\n',
-            '  - \\usepackage{fontspec}\n',
-            '  - \\usepackage{polyglossia}\n',
-            '  - \\setmainlanguage{persian}\n',
-            '  - \\setotherlanguage{english}\n',
-            '  - \\newfontfamily\\persianfont[Script=Arabic]{FreeSerif}\n',
-            '---\n\n',
-            '# خلاصه اجرایی\n\n',
-            'این گزارش توسط سیستم خودکار تحلیل آب‌وهوا تهیه شده است.\n\n',
-            '**ایستگاه:** ', rd$station_name, '\n\n',
-            '**بازه زمانی:** ', rd$date_range[1], ' تا ', rd$date_range[2], '\n\n',
-            '**تعداد روزهای تحلیل:** ', nrow(rd$df), '\n\n',
-            '# آمار توصیفی\n\n',
-            '```{r, echo=FALSE}\n',
-            'knitr::kable(rd_summary, caption = "خلاصه آماری", align = "lr")\n',
-            '```\n\n',
-            fc_text, '\n',
-            anom_text, '\n',
-            lb_text, '\n',
-            '# نتیجه‌گیری\n\n',
-            'این گزارش بر اساس داده‌های هواشناسی تاریخی تهیه شده و اطلاعات آن\n',
-            'جهت تصمیم‌گیری‌های آب‌وهوایی قابل استفاده است.\n'
-          )
-          
-          writeLines(rmd_content, tmp_rmd, useBytes = TRUE)
-          
-          rd_env <- new.env()
-          rd_env$rd_summary <- rd$summary
-          
-          pdf_ok <- tryCatch({
-            rmarkdown::render(
-              tmp_rmd,
-              output_file = file,
-              envir       = rd_env,
-              quiet       = TRUE
-            )
-            TRUE
-          }, error = function(e) {
-            message("PDF render خطا: ", e$message)
-            FALSE
-          })
-          
-          if (!pdf_ok) {
-            showNotification(
-              "ساخت PDF ناموفق بود (نیاز به LaTeX/xelatex). از دکمه HTML استفاده کنید.",
-              type = "warning", duration = 12
-            )
-          } else {
-            showNotification("فایل PDF آماده شد.", type = "message")
-          }
-          
-        }, error = function(e) {
-          showNotification(
-            paste("خطا در ساخت PDF:", e$message),
-            type = "error", duration = 15
-          )
+          showNotification(paste("خطا در ساخت Excel:", e$message), type = "error", duration = 15)
         })
       }
     )
     
     # ── دانلود HTML ───────────────────────────────────────────────────────────
     output$download_html <- downloadHandler(
-      filename = function() {
-        paste0("weather_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".html")
-      },
+      filename = function() { paste0("weather_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".html") },
       content = function(file) {
         req(report_data())
         rd <- report_data()
         
         tryCatch({
-          html_content <- build_html_report(rd, input, forecast_rv(),
-                                            anomaly_rv(), leaderboard_rv())
+          html_content <- build_html_report(rd, input, forecast_rv(), anomaly_rv(), leaderboard_rv())
           writeLines(html_content, file, useBytes = TRUE)
           showNotification("فایل HTML آماده شد.", type = "message")
         }, error = function(e) {
-          showNotification(
-            paste("خطا در ساخت HTML:", e$message),
-            type = "error", duration = 15
-          )
+          showNotification(paste("خطا در ساخت HTML:", e$message), type = "error", duration = 15)
         })
       }
     )
   })
 }
 
-# ── ساخت HTML گزارش (جایگزین PDF در صورت نبود LaTeX) ──────────────────────
+# ── ساخت HTML گزارش ─────────────────────────────────────────────────────────
 build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv) {
-  fc_section   <- ""
-  anom_section <- ""
-  lb_section   <- ""
+  fc_section <- ""; anom_section <- ""; lb_section <- ""
   
-  if (!is.null(forecast_rv)) {
-    fr <- forecast_rv
+  if (!is.null(forecast_rv) && length(forecast_rv$preds_list) > 0) {
+    fc_df <- data.frame(Timestamp = format(forecast_rv$timestamps, "%Y-%m-%d %H:%M"))
+    for (m_name in names(forecast_rv$preds_list)) {
+      m_data <- forecast_rv$preds_list[[m_name]]
+      fc_df[[m_data$method]] <- round(as.numeric(m_data$preds), 2)
+    }
+    
+    header <- paste0("<tr><th>", paste(colnames(fc_df), collapse="</th><th>"), "</th></tr>")
+    rows <- paste(apply(fc_df, 1, function(row) {
+      paste0("<tr><td>", paste(row, collapse="</td><td>"), "</td></tr>")
+    }), collapse="")
+    
     fc_section <- paste0(
-      "<h2>پیش‌بینی</h2>",
-      "<p>مدل: <b>", fr$fc$method, "</b> &nbsp;|&nbsp; افق: <b>", fr$horizon, " روز</b></p>",
-      "<p>میانگین پیش‌بینی: <b>",
-      round(mean(fr$fc$predictions, na.rm = TRUE), 2), "</b></p>"
+      "<h2>پیش‌بینی ۲۴ ساعت آینده</h2>",
+      "<table>", header, rows, "</table>"
     )
   }
   
@@ -495,10 +247,11 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
     )
   }
   
-  if (!is.null(leaderboard_rv)) {
-    best <- leaderboard_rv[1, ]
+  if (!is.null(leaderboard_rv) && !is.null(leaderboard_rv$metrics)) {
+    lb_df <- leaderboard_rv$metrics
+    best <- lb_df[1, ]
     lb_rows <- tryCatch({
-      lb <- utils::head(leaderboard_rv, 10)
+      lb <- utils::head(lb_df, 10)
       cols <- intersect(c("model", "RMSE", "MAE", "R2", "composite_score"), names(lb))
       paste(apply(lb, 1, function(row) {
         cells <- paste(sapply(cols, function(c) paste0("<td>", row[[c]], "</td>")), collapse = "")
@@ -506,16 +259,12 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
       }), collapse = "")
     }, error = function(e) "")
     hdr_names <- if (nzchar(lb_rows))
-      paste(sapply(intersect(c("model", "RMSE", "MAE", "R2", "composite_score"),
-                             names(leaderboard_rv)),
-                   function(c) paste0("<th>", c, "</th>")), collapse = "")
+      paste0("<tr><th>", paste(sapply(intersect(c("model", "RMSE", "MAE", "R2", "composite_score"), names(lb_df)), function(c) c), collapse="</th><th>"), "</th></tr>")
     else ""
     lb_section <- paste0(
       "<h2>رتبه‌بندی مدل‌ها</h2>",
       "<p>بهترین مدل: <b>", best$model, "</b> (RMSE: ", round(best$RMSE, 3), ")</p>",
-      if (nzchar(lb_rows))
-        paste0("<table><tr>", hdr_names, "</tr>", lb_rows, "</table>")
-      else ""
+      if (nzchar(lb_rows)) paste0("<table>", hdr_names, lb_rows, "</table>") else ""
     )
   }
   
@@ -547,12 +296,7 @@ build_html_report <- function(rd, input, forecast_rv, anomaly_rv, leaderboard_rv
     "</div>",
     "<h2>آمار توصیفی</h2>",
     "<table><tr><th>معیار</th><th>مقدار</th></tr>",
-    paste(
-      apply(rd$summary, 1, function(row) {
-        paste0("<tr><td>", row[1], "</td><td>", row[2], "</td></tr>")
-      }),
-      collapse = ""
-    ),
+    paste(apply(rd$summary, 1, function(row) paste0("<tr><td>", row[1], "</td><td>", row[2], "</td></tr>")), collapse = ""),
     "</table>",
     fc_section, anom_section, lb_section,
     "<footer><i>این گزارش به‌صورت خودکار توسط سیستم تحلیل آب‌وهوا تهیه شده است.</i></footer>",

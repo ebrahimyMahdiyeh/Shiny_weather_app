@@ -762,7 +762,7 @@ ui <- shinydashboard::dashboardPage(
       class = "dropdown",
       style = "display:flex;align-items:center;height:50px;padding:0 20px;gap:20px;font-size:13px;color:var(--text3);font-weight:600;",
       tags$span(style="display:flex;align-items:center;gap:6px;",
-                tags$i(class="fa fa-database",style="color:#3b82f6;font-size:14px;"), "۱۸۵K رکورد"),
+                tags$i(class="fa fa-database",style="color:#3b82f6;font-size:14px;"), "250K رکورد"),
       tags$span(style="display:flex;align-items:center;gap:6px;",
                 tags$i(class="fa fa-location-dot",style="color:#14b8a6;font-size:14px;"), "۵ ایستگاه"),
       tags$span(
@@ -1060,7 +1060,7 @@ server <- function(input, output, session) {
   
   weather_data <- reactive({ WEATHER_DATA })
   
-  homeServer("home",             weather_data)
+  homeServer("home", weather_data, hourly_data = reactive({ WEATHER_DATA_HOURLY }))
   forecast_rv <- forecastServer("forecast",     weather_data,
                                 hourly_data = reactive({ WEATHER_DATA_HOURLY }))
   leaderboard_rv <- leaderboardServer("leaderboard", weather_data)

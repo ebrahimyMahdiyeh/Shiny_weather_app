@@ -1,4 +1,4 @@
-# File: modules/leaderboard_module.R  (نسخه کامل با UI + AutoML Ensemble + حذف TBATS)
+# File: modules/leaderboard_module.R  (نسخه کامل با UI + AutoML Ensemble + حذف TBATS + پشتیبانی تم)
 # ماژول رتبه‌بندی مدل‌ها — UI کامل + Server
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -12,7 +12,7 @@ leaderboardUI <- function(id) {
              tags$style(HTML("
         .lb-wrapper {
           font-size: 18px; /* فونت پایه کلی به شدت افزایش یافت */
-          color: #cbd5e1;
+          color: var(--text2);
         }
         .lb-wrapper .box-title {
           font-size: 20px !important;
@@ -33,16 +33,16 @@ leaderboardUI <- function(id) {
         .lb-wrapper table.dataTable thead th {
           font-size: 18px !important;
           font-weight: 800 !important;
-          color: #e2e8f0 !important;
-          border-bottom: 2px solid rgba(99,143,232,0.3) !important;
+          color: var(--text) !important;
+          border-bottom: 2px solid var(--border) !important;
         }
         .lb-wrapper table.dataTable tbody td {
           padding: 12px 8px !important;
         }
 
         .lb-hero{
-          background:linear-gradient(135deg,#0d1b35 0%,#0f2347 55%,#0a1628 100%);
-          border:1px solid rgba(99,143,232,.15);
+          background: var(--hero-grad);
+          border:1px solid var(--border);
           border-radius:16px;
           padding:28px 32px;
           margin-bottom:16px;
@@ -52,13 +52,13 @@ leaderboardUI <- function(id) {
         .lb-hero::before{
           content:'';position:absolute;top:0;left:0;width:5px;height:100%;background:linear-gradient(to bottom,#3b82f6,#22c55e);
         }
-        .lb-hero h2{margin:0 0 10px;color:#f1f5f9;font-size:28px;font-weight:800;}
-        .lb-hero p{margin:0 0 24px;color:#94a3b8;font-size:16px;line-height:1.8;max-width:85%;}
+        .lb-hero h2{margin:0 0 10px;color:var(--text);font-size:28px;font-weight:800;}
+        .lb-hero p{margin:0 0 24px;color:var(--text2);font-size:16px;line-height:1.8;max-width:85%;}
         .lb-hero .badge{
           display:inline-flex;align-items:center;gap:6px;
-          background:rgba(59,130,246,.1);
-          border:1px solid rgba(59,130,246,.25);
-          color:#60a5fa;border-radius:20px;
+          background:var(--input-bg);
+          border:1px solid var(--border);
+          color:var(--blue2);border-radius:20px;
           padding:8px 16px;font-size:14px;font-weight:700;
           margin-bottom:14px;
         }
@@ -67,14 +67,14 @@ leaderboardUI <- function(id) {
           display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
           padding-top:20px;
           margin-top:10px;
-          border-top:1px solid rgba(99,143,232,.15);
+          border-top:1px solid var(--border);
         }
         .lb-hero-stat-item{
           display:flex;align-items:center;gap:14px;
           padding:16px 20px;
-          background:rgba(17,24,39,0.6);
+          background:var(--panel2);
           border-radius:12px;
-          border:1px solid rgba(99,143,232,.1);
+          border:1px solid var(--border);
           box-shadow:0 4px 6px rgba(0,0,0,0.1);
         }
         .lb-hero-stat-icon{
@@ -82,22 +82,22 @@ leaderboardUI <- function(id) {
           display:flex;align-items:center;justify-content:center;
           border-radius:10px;
           background:linear-gradient(135deg, rgba(59,130,246,0.2), rgba(34,197,94,0.2));
-          color:#60a5fa;
+          color:var(--blue2);
           font-size:22px;
         }
         .lb-hero-stat-text{display:flex;flex-direction:column;}
-        .lb-hero-stat-val{font-size:22px;font-weight:800;color:#f8fafc;line-height:1.2;}
-        .lb-hero-stat-lbl{font-size:14px;color:#94a3b8;margin-top:4px;font-weight:600;}
+        .lb-hero-stat-val{font-size:22px;font-weight:800;color:var(--text);line-height:1.2;}
+        .lb-hero-stat-lbl{font-size:14px;color:var(--text2);margin-top:4px;font-weight:600;}
 
         .lb-control-card{
-          background:#111827;border:1px solid rgba(99,143,232,.15);
+          background:var(--panel);border:1px solid var(--border);
           border-radius:10px;padding:14px 16px;
           font-size:16px;
         }
 
         .reco-card{
           background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(59,130,246,.08));
-          border:1px solid rgba(34,197,94,.3);
+          border:1px solid var(--border2);
           border-radius:12px;
           padding:20px;
           box-shadow:0 4px 15px rgba(0,0,0,0.2);
@@ -114,7 +114,7 @@ leaderboardUI <- function(id) {
           text-transform:uppercase;letter-spacing:0.5px;
         }
         .reco-model{
-          font-size:30px;font-weight:800;color:#f8fafc;
+          font-size:30px;font-weight:800;color:var(--text);
           margin-bottom:12px;display:flex;align-items:center;gap:12px;
         }
         .reco-score{
@@ -126,21 +126,21 @@ leaderboardUI <- function(id) {
           margin-bottom:18px;
         }
         .reco-why{
-          background:rgba(15,23,42,0.5);
+          background:var(--panel2);
           border-radius:8px;padding:14px 16px;margin-bottom:16px;
         }
         .reco-why div{
-          font-size:16px;color:#cbd5e1;margin:10px 0;
+          font-size:16px;color:var(--text2);margin:10px 0;
           display:flex;align-items:center;gap:10px;
         }
         .reco-why i{color:#22c55e;font-size:16px;width:18px;text-align:center;}
         .reco-alt{
-          font-size:15px;color:#94a3b8;
-          padding-top:14px;border-top:1px dashed rgba(99,143,232,.2);
+          font-size:15px;color:var(--text2);
+          padding-top:14px;border-top:1px dashed var(--border2);
         }
         .reco-alt-item {
           display:flex;align-items:center;gap:10px;
-          margin-top:10px;background:rgba(30,45,69,0.4);
+          margin-top:10px;background:var(--input-bg);
           padding:12px 14px;border-radius:6px;
           font-size:15px;
         }
@@ -150,16 +150,16 @@ leaderboardUI <- function(id) {
           display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;
         }
         .stab-card{
-          background:rgba(34,197,94,.05);
-          border:1px solid rgba(34,197,94,.15);
+          background:var(--input-bg);
+          border:1px solid var(--border);
           border-radius:6px;padding:10px 12px;text-align:center;
         }
         .stab-val{font-size:20px;font-weight:800;color:#22c55e;}
-        .stab-lbl{font-size:12px;color:#64748b;margin-top:2px;}
+        .stab-lbl{font-size:12px;color:var(--text3);margin-top:2px;}
 
         .speed-row{margin-bottom:12px;}
-        .speed-label{display:flex;justify-content:space-between;font-size:16px;color:#cbd5e1;margin-bottom:5px;font-weight:600;}
-        .speed-track{height:10px;background:rgba(99,143,232,.08);border-radius:5px;overflow:hidden;}
+        .speed-label{display:flex;justify-content:space-between;font-size:16px;color:var(--text2);margin-bottom:5px;font-weight:600;}
+        .speed-track{height:10px;background:var(--border);border-radius:5px;overflow:hidden;}
         .speed-fill{height:100%;border-radius:5px;transition:width .3s ease;}
       ")),
              
@@ -187,7 +187,7 @@ leaderboardUI <- function(id) {
                column(3,
                       shinydashboard::box(
                         title = tags$span(
-                          tags$i(class="fa fa-sliders", style="margin-left:6px;color:#60a5fa;"),
+                          tags$i(class="fa fa-sliders", style="margin-left:6px;color:var(--blue2);"),
                           "تنظیمات Benchmark"
                         ),
                         width = 12, solidHeader = FALSE, status = "primary",
@@ -217,7 +217,7 @@ leaderboardUI <- function(id) {
                         ),
                         hr(),
                         tags$div(class="lb-control-card",
-                                 tags$div(style="font-size:14px;color:#64748b;margin-bottom:6px;",
+                                 tags$div(style="font-size:14px;color:var(--text3);margin-bottom:6px;",
                                           "زمان کل اجرا:"),
                                  uiOutput(ns("bench_time_val"))
                         )
@@ -260,7 +260,7 @@ leaderboardUI <- function(id) {
                         column(6,
                                shinydashboard::box(
                                  title = tags$span(
-                                   tags$i(class="fa fa-chart-bar", style="margin-left:6px;color:#60a5fa;"),
+                                   tags$i(class="fa fa-chart-bar", style="margin-left:6px;color:var(--blue2);"),
                                    "مقایسه معیارها"
                                  ),
                                  width = 12, solidHeader = FALSE, status = "primary",
@@ -301,7 +301,7 @@ leaderboardUI <- function(id) {
                           "تحلیل پایداری مدل‌ها"
                         ),
                         width = 12, solidHeader = FALSE, status = "success",
-                        tags$div(style="font-size:14px;color:#64748b;margin-bottom:10px;",
+                        tags$div(style="font-size:14px;color:var(--text3);margin-bottom:10px;",
                                  "رتبه‌بندی مدل‌ها در ۳ پنجره زمانی مختلف — پایداری = عملکرد ثابت در طول زمان"),
                         shinycssloaders::withSpinner(
                           uiOutput(ns("stability_cards_ui")),
@@ -320,7 +320,7 @@ leaderboardUI <- function(id) {
                           "زمان اجرای مدل‌ها"
                         ),
                         width = 12, solidHeader = FALSE, status = "warning",
-                        tags$div(style="font-size:14px;color:#64748b;margin-bottom:10px;",
+                        tags$div(style="font-size:14px;color:var(--text3);margin-bottom:10px;",
                                  "مدت زمان آموزش هر مدل (ثانیه) — برای مقاینه سرعت نسبی"),
                         shinycssloaders::withSpinner(
                           uiOutput(ns("speed_bars_ui")),
@@ -340,7 +340,7 @@ leaderboardUI <- function(id) {
                         ),
                         width = 12, solidHeader = FALSE, status = "info",
                         tags$div(style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;",
-                                 tags$div(style="font-size:14px;color:#64748b;",
+                                 tags$div(style="font-size:14px;color:var(--text3);",
                                           "اجرای Benchmark برای همه ایستگاه‌ها با همه مدل‌ها — مقایسه عملکرد منطقه‌ای"),
                                  actionButton(ns("run_regional"),
                                               label = tagList(tags$i(class="fa fa-play"), " اجرای Heatmap منطقه‌ای"),
@@ -635,9 +635,9 @@ leaderboardServer <- function(id, weather_data) {
     
     output$bench_time_val <- renderUI({
       if (is.null(benchmark_data())) {
-        tags$span(style="color:#64748b;font-size:18px;", "—")
+        tags$span(style="color:var(--text3);font-size:18px;", "—")
       } else {
-        tags$span(style="color:#60a5fa;font-size:22px;font-weight:800;",
+        tags$span(style="color:var(--blue2);font-size:22px;font-weight:800;",
                   paste0(benchmark_data()$info$exec_time, " ثانیه"))
       }
     })
@@ -725,8 +725,8 @@ leaderboardServer <- function(id, weather_data) {
         plotly::layout(
           paper_bgcolor = "transparent", plot_bgcolor  = "transparent",
           font = list(family="Vazirmatn,Tahoma", color="#94a3b8", size=15),
-          xaxis = list(title="", gridcolor="transparent", tickfont=list(size=14, color="#cbd5e1")),
-          yaxis = list(title=metric, gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=14, color="#cbd5e1")),
+          xaxis = list(title="", gridcolor="transparent", tickfont=list(size=14, color="#94a3b8")),
+          yaxis = list(title=metric, gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=14, color="#94a3b8")),
           margin = list(l=60, r=20, t=10, b=60), showlegend = FALSE) %>%
         plotly::config(displayModeBar=FALSE)
     })
@@ -749,8 +749,8 @@ leaderboardServer <- function(id, weather_data) {
         plotly::layout(
           paper_bgcolor = "transparent", plot_bgcolor = "transparent",
           font = list(family="Vazirmatn", color="#94a3b8", size=15),
-          xaxis = list(title = "زمان اجرا (ثانیه)", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#cbd5e1")),
-          yaxis = list(title = "RMSE", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#cbd5e1")),
+          xaxis = list(title = "زمان اجرا (ثانیه)", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#94a3b8")),
+          yaxis = list(title = "RMSE", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#94a3b8")),
           legend = list(orientation = "h", y = -0.2, font=list(size=14))) %>%
         plotly::config(displayModeBar = FALSE)
     })
@@ -785,8 +785,8 @@ leaderboardServer <- function(id, weather_data) {
         plotly::layout(
           paper_bgcolor = "transparent", plot_bgcolor  = "transparent",
           font = list(family="Vazirmatn", color="#94a3b8", size=14),
-          xaxis = list(title="", gridcolor="transparent", tickfont=list(size=13, color="#cbd5e1")),
-          yaxis = list(title="Score", gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=13, color="#cbd5e1")),
+          xaxis = list(title="", gridcolor="transparent", tickfont=list(size=13, color="#94a3b8")),
+          yaxis = list(title="Score", gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=13, color="#94a3b8")),
           margin = list(l=50, r=20, t=10, b=50)) %>%
         plotly::config(displayModeBar = FALSE)
     })
@@ -854,7 +854,7 @@ leaderboardServer <- function(id, weather_data) {
                  )
         ),
         tags$div(class = "reco-alt",
-                 tags$strong(style="color:#e2e8f0; display:block; margin-bottom:8px; font-size:16px;", "مدل‌های جایگزین:"),
+                 tags$strong(style="color:var(--text); display:block; margin-bottom:8px; font-size:16px;", "مدل‌های جایگزین:"),
                  tags$div(class="reco-alt-item",
                           tags$i(class="fa fa-bolt", style="color:#f59e0b;"),
                           tags$span(paste0("اولویت با سرعت: ", best_speed_name, " (", round(best_speed$exec_time, 3), "s)"))

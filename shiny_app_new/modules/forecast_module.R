@@ -124,16 +124,17 @@ forecastUI <- function(id) {
              tags$style(HTML("
         .fc-wrapper {
           font-size: 15px;
-          color: #cbd5e1;
+          color: var(--text2);
           font-family: 'Vazirmatn', sans-serif;
         }
         .fc-wrapper .box-title { font-size: 16px !important; font-weight: 800 !important; }
         .fc-wrapper label { font-size: 14px !important; font-weight: 600; }
         .fc-wrapper .form-control, .fc-wrapper .selectize-input { font-size: 14px !important; }
 
-        .weather-hero{
-          background:linear-gradient(135deg,#0d1b35 0%,#0f2347 55%,#0a1628 100%);
-          border:1px solid rgba(99,143,232,.15);
+        /* Hero Card (کارت بالایی - همیشه تیره می‌ماند تا متن‌های سفید خوانا باشند) */
+                .weather-hero{
+          background: var(--hero-grad);
+          border:1px solid var(--border);
           border-radius:16px;
           padding:24px 28px;
           margin-bottom:16px;
@@ -148,111 +149,120 @@ forecastUI <- function(id) {
           background:radial-gradient(circle,rgba(59,130,246,.08) 0%,transparent 70%);
           border-radius:50%;pointer-events:none;
         }
-        .hero-divider{width:1px;background:rgba(99,143,232,.1);height:100%;}
+        .hero-divider{width:1px;background:var(--border);height:100%;}
         .hero-main{display:flex;flex-direction:column;justify-content:space-between;z-index:1;}
         .loc-time{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
-        .loc-time .city{font-size:16px;font-weight:800;color:#fff;}
-        .loc-time .time{font-size:12px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.05);padding:3px 10px;border-radius:10px;}
+        .loc-time .city{font-size:16px;font-weight:800;color:var(--text);}
+        .loc-time .time{font-size:12px;color:var(--text3);background:var(--input-bg);padding:3px 10px;border-radius:10px;}
         .temp-block{display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;}
-        .big-temp{font-size:68px;font-weight:900;line-height:1;color:#fff;letter-spacing:-3px;}
-        .big-temp sup{font-size:24px;font-weight:400;color:rgba(255,255,255,.4);vertical-align:super;}
+        .big-temp{font-size:68px;font-weight:900;line-height:1;color:var(--text);letter-spacing:-3px;}
+        .big-temp sup{font-size:24px;font-weight:400;color:var(--text3);vertical-align:super;}
         .big-icon{font-size:56px;line-height:1;margin-top:5px;}
         .cond-feels{display:flex;align-items:center;gap:12px;margin-bottom:15px;}
-        .cond{font-size:16px;font-weight:700;color:#e2e8f0;}
-        .chip{font-size:13px;font-weight:600;color:#94a3b8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:4px 12px;border-radius:20px;}
-        .hero-trend{margin-top:auto;border-top:1px solid rgba(255,255,255,.05);padding-top:10px;}
-        .trend-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+        .cond{font-size:16px;font-weight:700;color:var(--text);}
+        .chip{font-size:13px;font-weight:600;color:var(--text2);background:var(--input-bg);border:1px solid var(--border);padding:4px 12px;border-radius:20px;}
+        .hero-trend{margin-top:auto;border-top:1px solid var(--border);padding-top:10px;}
+        .trend-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
         
         .hero-metrics{display:flex;flex-direction:column;z-index:1;}
-        .metrics-header{font-size:12px;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
-        .today-summary{display:flex;gap:18px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.05);}
-        .today-item{display:flex;align-items:center;gap:6px;font-size:18px;font-weight:700;color:#e2e8f0;}
+        .metrics-header{font-size:12px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
+        .today-summary{display:flex;gap:18px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+        .today-item{display:flex;align-items:center;gap:6px;font-size:18px;font-weight:700;color:var(--text);}
         .today-item i{font-size:14px;}
         
         .metric-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:18px; }
         .metric-item{display:flex;flex-direction:column;gap:5px;}
         .m-icon-lbl{display:flex;align-items:center;gap:6px;}
-        .m-icon{font-size:14px;color:#60a5fa;width:16px;text-align:center;}
-        .m-lbl{font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;}
-        .m-val{font-size:18px;font-weight:800;color:#f8fafc;}
+        .m-icon{font-size:14px;color:var(--blue);width:16px;text-align:center;}
+        .m-lbl{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+        .m-val{font-size:18px;font-weight:800;color:var(--text);}
         
         @media (max-width: 1100px) {
           .weather-hero { grid-template-columns: 1fr; }
           .hero-divider { display:none; }
         }
 
+        /* Hourly Cards */
         .hourly-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:thin;scrollbar-color:rgba(99,143,232,.15) transparent;direction:rtl;}
         .hourly-strip::-webkit-scrollbar{height:4px;}
         .hourly-strip::-webkit-scrollbar-thumb{background:rgba(99,143,232,.18);border-radius:2px;}
-        .hour-card{flex-shrink:0;background:rgba(255,255,255,.025);border:1px solid rgba(99,143,232,.1);border-radius:10px;padding:10px 12px;text-align:center;min-width:65px;transition:all .15s;cursor:default;}
-        .hour-card:hover{background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.22);}
+        .hour-card{flex-shrink:0;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center;min-width:65px;transition:all .15s;cursor:default;}
+        .hour-card:hover{background:var(--hover-bg);border-color:var(--border2);}
         .hour-card.now-hour{background:rgba(59,130,246,.13);border-color:rgba(59,130,246,.38);}
-        .hour-time{font-size:13px;color:#94a3b8;font-weight:600;margin-bottom:4px;}
+        .hour-time{font-size:13px;color:var(--text2);font-weight:600;margin-bottom:4px;}
         .hour-icon{font-size:22px;margin:3px 0;}
-        .hour-temp{font-size:18px;font-weight:800;color:#f8fafc;}
+        .hour-temp{font-size:18px;font-weight:800;color:var(--text);}
         .hour-prob{font-size:11px;color:#60a5fa;margin-top:3px;font-weight:600;}
 
-        .fc-chart-box{background:#111827;border:1px solid rgba(99,143,232,.15);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
-        .fc-section-lbl{font-size:13px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:7px;margin-bottom:12px;}
-        .fc-section-lbl::after{content:'';flex:1;height:1px;background:rgba(99,143,232,.09);}
+        /* Chart Boxes */
+        .fc-chart-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+        .fc-section-lbl{font-size:13px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:7px;margin-bottom:12px;}
+        .fc-section-lbl::after{content:'';flex:1;height:1px;background:var(--border);}
 
+        /* Week Mini */
         .week-mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;direction:rtl;}
-        .wm-card{background:rgba(255,255,255,.022);border:1px solid rgba(99,143,232,.09);border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
-        .wm-card:hover{border-color:rgba(99,143,232,.22);background:rgba(255,255,255,.04);}
-        .wm-card.sel{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.35);}
+        .wm-card{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+        .wm-card:hover{border-color:var(--border2);background:var(--hover-bg);}
+        .wm-card.sel{background:var(--active-bg);border-color:var(--blue);}
         .wm-card.today-col::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#14b8a6);}
-        .wm-name{font-size:12px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px;}
-        .wm-date{font-size:11px;color:#64748b;margin-bottom:6px;}
+        .wm-name{font-size:12px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px;}
+        .wm-date{font-size:11px;color:var(--text3);margin-bottom:6px;}
         .wm-icon{font-size:24px;margin:4px 0;}
-        .wm-max{font-size:18px;font-weight:900;color:#f8fafc;}
-        .wm-min{font-size:14px;color:#94a3b8;margin-top:2px;font-weight:600;}
+        .wm-max{font-size:18px;font-weight:900;color:var(--text);}
+        .wm-min{font-size:14px;color:var(--text2);margin-top:2px;font-weight:600;}
         .wm-rain{font-size:11px;color:#60a5fa;font-weight:600;display:flex;align-items:center;justify-content:center;gap:2px;margin-top:4px;}
-        .wm-bar{height:4px;border-radius:2px;margin:4px auto;width:75%;background:rgba(99,143,232,.1);overflow:hidden;position:relative;}
+        .wm-bar{height:4px;border-radius:2px;margin:4px auto;width:75%;background:var(--border);overflow:hidden;position:relative;}
         .wm-bar-fill{height:100%;border-radius:2px;position:absolute;background:linear-gradient(90deg,#3b82f6,#f59e0b);}
 
-        .fc-ctrl-box{background:#111827;border:1px solid rgba(99,143,232,.15);border-radius:12px;padding:14px;margin-bottom:12px;}
-        .fc-ctrl-lbl{font-size:13px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;}
+        /* Control Box */
+        .fc-ctrl-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+        .fc-ctrl-lbl{font-size:13px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;}
         
+        /* Checkboxes */
         .mv-box{margin-top:10px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:10px;}
         .mv-box .form-group{margin-bottom:0;}
         .mv-box .checkbox{margin:0; padding:0; text-align:center;}
         .mv-box .checkbox label{
           display:flex; flex-direction:row-reverse; justify-content:center; align-items:center;
-          gap:8px; padding:0; font-size:13px; font-weight:600; color:#94a3b8; cursor:pointer;
+          gap:8px; padding:0; font-size:13px; font-weight:600; color:var(--text2); cursor:pointer;
         }
         .mv-box .checkbox input[type='checkbox']{margin:0; position:static; cursor:pointer; width:16px; height:16px; accent-color:#22d3ee;}
         .mv-box.compare-box{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);}
         .mv-box.compare-box .checkbox input[type='checkbox']{accent-color:#22c55e;}
-        .mv-box-disabled{margin-top:10px;background:rgba(100,116,139,.05);border:1px solid rgba(100,116,139,.15);border-radius:8px;padding:10px;text-align:center;font-size:12px;color:#64748b;display:flex;align-items:center;justify-content:center;gap:6px;}
+        .mv-box-disabled{margin-top:10px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;font-size:12px;color:var(--text3);display:flex;align-items:center;justify-content:center;gap:6px;}
         
-        .eval-container{margin-top:12px;background:rgba(30,41,59,.6);border:1px solid rgba(99,143,232,0.1);border-radius:8px;padding:14px;}
-        .eval-header{font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+        /* Evaluation Table */
+        .eval-container{margin-top:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:14px;}
+        .eval-header{font-size:14px;font-weight:800;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
         .eval-header i{color:#22c55e;}
         .eval-table{width:100%;border-collapse:collapse;}
-        .eval-table th{text-align:center;color:#94a3b8;font-size:13px;font-weight:700;padding:8px 4px;border-bottom:2px solid rgba(99,143,232,0.15);}
+        .eval-table th{text-align:center;color:var(--text2);font-size:13px;font-weight:700;padding:8px 4px;border-bottom:2px solid var(--border);}
         .eval-table th:first-child{text-align:right;}
-        .eval-table td{text-align:center;color:#e2e8f0;font-size:15px;font-weight:700;padding:10px 4px;border-bottom:1px solid rgba(99,143,232,0.08);}
-        .eval-table td:first-child{text-align:right;color:#f1f5f9;font-weight:800;}
-        .eval-footer{display:flex;justify-content:space-between;border-top:1px solid rgba(99,143,232,.1);padding-top:12px;margin-top:8px;color:#94a3b8;font-size:13px;font-weight:600;}
+        .eval-table td{text-align:center;color:var(--text);font-size:15px;font-weight:700;padding:10px 4px;border-bottom:1px solid var(--border);}
+        .eval-table td:first-child{text-align:right;color:var(--text);font-weight:800;}
+        .eval-footer{display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:12px;margin-top:8px;color:var(--text2);font-size:13px;font-weight:600;}
         .eval-footer span{display:flex;align-items:center;gap:5px;}
         
+        /* Daily Comparison */
         .om-row{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(34,197,94,0.3);}
         .om-label{font-size:10px;color:#22c55e;font-weight:700;text-align:center;margin-bottom:3px;}
-        .daily-comp-box{margin-top:15px;background:rgba(30,41,59,.6);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px;}
+        .daily-comp-box{margin-top:15px;background:var(--panel2);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px;}
         .daily-comp-header{font-size:14px;font-weight:700;color:#22c55e;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
         .comp-table{width:100%;border-collapse:collapse;}
-        .comp-table td{padding:8px 0;font-size:14px;}
-        .comp-table td:first-child{text-align:right;color:#94a3b8;}
-        .comp-table td:last-child{text-align:center;font-weight:800;color:#f8fafc;font-size:16px;}
+        .comp-table td{padding:8px 0;font-size:14px;border-bottom: 1px solid var(--border);}
+        .comp-table tr:last-child td {border-bottom: none;}
+        .comp-table td:first-child{text-align:right;color:var(--text2);}
+        .comp-table td:last-child{text-align:center;font-weight:800;color:var(--text);font-size:16px;}
         
+        /* Model Selector Pills */
         .daily-model-selector { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
         .daily-pill {
           padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
-          cursor: pointer; background: rgba(255,255,255,0.04); border: 1px solid rgba(99,143,232,0.15);
-          color: #94a3b8; transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+          cursor: pointer; background: var(--input-bg); border: 1px solid var(--border);
+          color: var(--text2); transition: all 0.2s; display: flex; align-items: center; gap: 8px;
         }
-        .daily-pill:hover { background: rgba(59,130,246,0.1); color: #e2e8f0; }
-        .daily-pill.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #fff; }
+        .daily-pill:hover { background: var(--hover-bg); color: var(--text); }
+        .daily-pill.active { background: var(--active-bg); border-color: var(--blue); color: var(--text); }
         .daily-pill .pill-dot { width: 10px; height: 10px; border-radius: 50%; }
       ")),
              
@@ -261,7 +271,7 @@ forecastUI <- function(id) {
                       tags$div(class="fc-ctrl-box",
                                tags$span(class="fc-ctrl-lbl", "ایستگاه"),
                                selectInput(ns("station"), label=NULL, choices=NULL, width="100%"),
-                               tags$hr(style="border-color:rgba(99,143,232,.12);margin:12px 0;"),
+                               tags$hr(style="border-color:var(--border);margin:12px 0;"),
                                
                                tags$span(class="fc-ctrl-lbl", "انتخاب مدل (امکان مقایسه)"),
                                shinyWidgets::pickerInput(
@@ -276,7 +286,7 @@ forecastUI <- function(id) {
                                  options = list(`actions-box` = TRUE, size = 10, `selected-text-format` = "count > 2"),
                                  width = "100%"
                                ),
-                               tags$hr(style="border-color:rgba(99,143,232,.12);margin:12px 0;"),
+                               tags$hr(style="border-color:var(--border);margin:12px 0;"),
                                
                                tags$span(class="fc-ctrl-lbl", "متغیر"),
                                selectInput(ns("target_var"), label=NULL,
@@ -297,13 +307,13 @@ forecastUI <- function(id) {
                                
                                uiOutput(ns("train_res_ui")),
                                
-                               tags$hr(style="border-color:rgba(99,143,232,.12);margin:12px 0;"),
+                               tags$hr(style="border-color:var(--border);margin:12px 0;"),
                                
                                actionButton(ns("refresh"),
                                             label=tags$span(tags$i(class="fa fa-rotate",style="margin-left:5px;"),"بروزرسانی آب‌وهوا"),
                                             class="btn btn-primary btn-block",
                                             style="font-size:13px;font-weight:600;padding:10px;"),
-                               tags$div(style="margin-top:6px;text-align:center;font-size:12px;color:#64748b;",
+                               tags$div(style="margin-top:6px;text-align:center;font-size:12px;color:var(--text3);",
                                         textOutput(ns("last_update"),inline=TRUE))
                       ),
                       uiOutput(ns("error_box"))
@@ -367,7 +377,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       prophet=list(label="Prophet",color="#8b5cf6"), rf=list(label="Random Forest",color="#f59e0b"),
       xgboost=list(label="XGBoost",color="#d97706"), lightgbm=list(label="LightGBM",color="#22d3ee"),
       catboost=list(label="CatBoost",color="#fb7185"), svm=list(label="SVM",color="#ef4444"),
-      naive=list(label="Naïve",color="#64748b"),
+      naive=list(label="Naïve",color="var(--text3)"),
       ensemble=list(label="AutoML Ensemble",color="#22c55e") 
     )
     ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
@@ -807,7 +817,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     
     output$hourly_strip <- renderUI({
       ld <- live_data()
-      if (is.null(ld) || is.null(ld$hourly)) return(tags$div(style="color:#64748b;text-align:center;padding:10px;font-size:14px;", "داده‌ای دریافت نشده"))
+      if (is.null(ld) || is.null(ld$hourly)) return(tags$div(style="color:var(--text3);text-align:center;padding:10px;font-size:14px;", "داده‌ای دریافت نشده"))
       now <- if (!is.null(ld$current) && !is.null(ld$current$time)) ld$current$time else Sys.time()
       h24 <- ld$hourly %>% dplyr::filter(time >= now - 3600, time <= now + 3600*24) %>% tail(24)
       if (nrow(h24) == 0) return(NULL)
@@ -828,7 +838,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       models <- input$selected_models
       mlp <- hourly_ml_pred()
       if (is.null(models) || length(models) == 0 || is.null(mlp) || length(mlp$preds_list) == 0) {
-        return(tags$div(style="text-align:center; padding:90px; color:#64748b; font-size:14px;", "روی «اجرای مدل» کلیک کنید تا پیش‌بینی ۲۴h ببینید"))
+        return(tags$div(style="text-align:center; padding:90px; color:var(--text3); font-size:14px;", "روی «اجرای مدل» کلیک کنید تا پیش‌بینی ۲۴h ببینید"))
       }
       plotly::plotlyOutput(ns("main_multimodel_chart"), height="350px")
     })
@@ -1081,7 +1091,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
                    tags$tbody(
                      tags$tr(
                        tags$td("میانگین اختلاف"),
-                       tags$td(style="color:#e2e8f0;", paste0(as.numeric(m$avg_diff), unit))
+                       tags$td(style="color:var(--text);", paste0(as.numeric(m$avg_diff), unit))
                      ),
                      tags$tr(
                        tags$td("کمترین اختلاف"),

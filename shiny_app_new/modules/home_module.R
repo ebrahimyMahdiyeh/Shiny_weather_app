@@ -239,7 +239,7 @@ modelMiniCard <- function(name, icon_name, color, type_label, desc) {
 }
 
 # ── Server ────────────────────────────────────────────────────────────────────
-homeServer <- function(id, weather_data) {
+homeServer <- function(id, weather_data, hourly_data = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
@@ -270,17 +270,32 @@ homeServer <- function(id, weather_data) {
     
     output$box_total_days <- shinydashboard::renderInfoBox({
       req(combined_data())
-      total <- format(nrow(combined_data()), big.mark = ",")
+      
+      # محاسبه تعداد واقعی رکوردها از داده‌های ساعتی (معادل فایل CSV)
+      total_records <- nrow(combined_data()) # پیش‌فرض: داده روزانه
+      
+      if (!is.null(hourly_data)) {
+        hd <- tryCatch(hourly_data(), error = function(e) NULL)
+        if (!is.null(hd)) {
+          total_records <- sum(sapply(hd, function(x) if(is.data.frame(x)) nrow(x) else 0), na.rm = TRUE)
+        }
+      } else if (exists("WEATHER_DATA_HOURLY", envir = globalenv())) {
+        # اگر پاس داده نشد، از محیط سراسری بگیرد
+        hd <- get("WEATHER_DATA_HOURLY", envir = globalenv())
+        total_records <- sum(sapply(hd, function(x) if(is.data.frame(x)) nrow(x) else 0), na.rm = TRUE)
+      }
+      
+      total <- format(total_records, big.mark = ",")
       shinydashboard::infoBox(
         title    = "کل رکورد داده",
         value    = total,
-        subtitle = "روز × ایستگاه",
+        subtitle = "رکورد ساعتی (۵ ایستگاه × ۲۴ ساعت)",
         icon     = icon("database"),
         color    = "green",
         fill     = TRUE
       )
     })
-    
+    #weather_all_cities_20210101_20260804
     output$box_models <- shinydashboard::renderInfoBox({
       shinydashboard::infoBox(
         title    = "مدل پیش‌بینی",
