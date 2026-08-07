@@ -1,4 +1,4 @@
-# File: modules/home_module.R  (نسخه ارتقاءیافته)
+# File: modules/home_module.R  (نسخه ارتقاءیافته + پشتیبانی تم + آنالیز کیفیت داده)
 # صفحه اول — نمای کلی، آمار داده‌ها، توضیح پروژه
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ homeUI <- function(id) {
       column(12,
              tags$div(class = "hero-banner",
                       tags$div(
-                        style = "display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#60a5fa;border-radius:20px;padding:4px 14px;font-size:10px;font-weight:700;margin-bottom:12px;",
+                        style = "display:inline-flex;align-items:center;gap:6px;background:var(--input-bg);border:1px solid var(--border);color:var(--blue2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;margin-bottom:12px;",
                         tags$i(class="fa fa-graduation-cap"), " پروژه پژوهشی — IEEE Publication 2025"
                       ),
                       tags$h2(
@@ -19,7 +19,7 @@ homeUI <- function(id) {
                         tags$span(class="grad", "آب‌وهوای ایران")
                       ),
                       tags$p(
-                        "مقایسه جامع ۱۱ مدل سری زمانی شامل روش‌های کلاسیک (ARIMA، SARIMA، ETS، TBATS)،",
+                        "مقایسه جامع ۱۱ مدل سری زمانی شامل روش‌های کلاسیک (ARIMA، SARIMA، ETS)،",
                         " یادگیری ماشین (RF، XGBoost، LightGBM، CatBoost، SVM) و مدل‌های مدرن (Prophet)",
                         " با استفاده از داده‌های هواشناسی ۵ ایستگاه ایران در بازه ۲۰۲۱–۲۰۲۵."
                       ),
@@ -44,18 +44,18 @@ homeUI <- function(id) {
       shinydashboard::infoBoxOutput(ns("box_years"),      width = 3)
     ),
     
-    # ── نمودار روند + جدول ایستگاه‌ها ──────────────────────────────────────
+    # ── نمودار روند + میانگین ماهانه ──────────────────────────────────────
     fluidRow(
       shinydashboard::box(
         title = tags$span(
-          tags$i(class="fa fa-chart-line", style="margin-left:7px;color:#60a5fa;"),
+          tags$i(class="fa fa-chart-line", style="margin-left:7px;color:var(--blue2);"),
           "روند دمای تاریخی — همه ایستگاه‌ها"
         ),
         width = 8, solidHeader = FALSE,
         tags$div(style="margin-bottom:10px;display:flex;gap:8px;align-items:center;",
-                 tags$span(style="font-size:10px;color:#64748b;", "میانگین ماهانه دما · ۲۰۲۱–۲۰۲۵"),
+                 tags$span(style="font-size:12px;color:var(--text3);", "میانگین ماهانه دما · ۲۰۲۱–۲۰۲۵"),
                  tags$span(
-                   style="background:rgba(59,130,246,0.1);color:#60a5fa;border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700;",
+                   style="background:var(--input-bg);color:var(--blue2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;",
                    "Open-Meteo API"
                  )
         ),
@@ -92,7 +92,7 @@ homeUI <- function(id) {
           "ایستگاه‌های هواشناسی"
         ),
         width = 7, solidHeader = FALSE,
-        tags$div(style="margin-bottom:10px;font-size:10px;color:#64748b;",
+        tags$div(style="margin-bottom:10px;font-size:12px;color:var(--text3);",
                  "داده روزانه · ۲۰۲۱–۲۰۲۵ · بدون نشت اطلاعات در تقسیم train/test"
         ),
         DT::DTOutput(ns("station_summary_table"))
@@ -107,7 +107,6 @@ homeUI <- function(id) {
         tags$div(
           style = "display:flex;flex-direction:column;gap:0;",
           
-          # گام‌های پژوهش
           homeStep("1", "fa-download",   "#3b82f6", "جمع‌آوری داده",
                    "دریافت داده‌های هواشناسی از Open-Meteo API: دما، رطوبت، باد، بارش"),
           homeStep("2", "fa-broom",      "#14b8a6", "پیش‌پردازش",
@@ -122,6 +121,8 @@ homeUI <- function(id) {
       )
     ),
     
+
+    
     # ── مدل‌ها + توزیع متغیرها ───────────────────────────────────────────────
     fluidRow(
       shinydashboard::box(
@@ -133,37 +134,32 @@ homeUI <- function(id) {
         tags$div(
           style = "display:grid;grid-template-columns:1fr 1fr;gap:10px;",
           
-          # ARIMA/SARIMA
           modelMiniCard("ARIMA / SARIMA", "fa-wave-square", "#3b82f6",
                         "کلاسیک · Box-Jenkins",
                         "سری زمانی ایستا یا قابل ایستاسازی با تفاضل"),
-          # ETS/TBATS
-          modelMiniCard("ETS / TBATS", "fa-chart-area", "#14b8a6",
+          modelMiniCard("ETS", "fa-chart-area", "#14b8a6",
                         "Exponential Smoothing",
                         "مدل‌سازی روند و فصلی‌بودن چندگانه"),
-          # Prophet
           modelMiniCard("Prophet", "fa-leaf", "#8b5cf6",
                         "Bayesian · Meta AI",
                         "تغییر روند و فصلی‌بودن با سری فوریه"),
-          # XGBoost/RF/LightGBM/CatBoost/SVM
           modelMiniCard("XGBoost · RF · LGBM · CatBoost", "fa-tree", "#f59e0b",
                         "یادگیری ماشین (ML)",
                         "ویژگی‌های lag و rolling-window با Early Stopping")
         ),
-        # Ensemble card
         tags$div(
           style = "margin-top:10px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:12px 14px;",
           tags$div(style="display:flex;align-items:center;gap:8px;margin-bottom:6px;",
                    tags$div(style="width:8px;height:8px;border-radius:50%;background:#22c55e;"),
-                   tags$span(style="font-size:12px;font-weight:800;color:#e2e8f0;", "AutoML Ensemble (وزن‌دار)"),
-                   tags$span(style="margin-right:auto;background:rgba(34,197,94,0.15);color:#4ade80;border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700;", "بهترین عملکرد کلی")
+                   tags$span(style="font-size:14px;font-weight:800;color:var(--text);", "AutoML Ensemble (وزن‌دار)"),
+                   tags$span(style="margin-right:auto;background:rgba(34,197,94,0.15);color:#4ade80;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;", "بهترین عملکرد کلی")
           ),
           tags$div(
             class = "formula-box",
-            style = "font-size:12px;margin:4px 0;",
+            style = "font-size:14px;margin:4px 0;",
             "ŷ = Σ(w_i × ŷ_i)   |   w_i = exp(-β × RMSE_i) / Σ exp(-β × RMSE_j)"
           ),
-          tags$div(style="font-size:11px;color:#94a3b8;",
+          tags$div(style="font-size:13px;color:var(--text2);",
                    "ترکیب وزن‌دار بهترین مدل‌ها بر اساس نمره ترکیبی"
           )
         )
@@ -199,21 +195,21 @@ homeUI <- function(id) {
 
 homeStep <- function(num, icon_name, color, title, desc) {
   tags$div(
-    style = "display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(99,143,232,0.08);",
+    style = "display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);",
     tags$div(
       style = paste0(
         "width:30px;height:30px;border-radius:50%;flex-shrink:0;",
         "background:", gsub("var\\(--blue\\)", "#3b82f6", color), "22;",
         "border:1.5px solid ", color, ";",
         "display:flex;align-items:center;justify-content:center;",
-        "color:", color, ";font-size:11px;"
+        "color:", color, ";font-size:12px;"
       ),
       tags$i(class = paste("fa", icon_name))
     ),
     tags$div(
-      tags$div(style="font-size:11px;font-weight:700;color:#e2e8f0;margin-bottom:2px;",
+      tags$div(style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;",
                paste0("گام ", num, " — ", title)),
-      tags$div(style="font-size:11px;color:#94a3b8;line-height:1.5;", desc)
+      tags$div(style="font-size:12px;color:var(--text2);line-height:1.5;", desc)
     )
   )
 }
@@ -221,20 +217,20 @@ homeStep <- function(num, icon_name, color, title, desc) {
 modelMiniCard <- function(name, icon_name, color, type_label, desc) {
   tags$div(
     style = paste0(
-      "background:rgba(255,255,255,0.025);border:1px solid rgba(99,143,232,0.15);",
+      "background:var(--input-bg);border:1px solid var(--border);",
       "border-radius:8px;padding:12px 14px;border-right:3px solid ", color, ";"
     ),
     tags$div(
       style = "display:flex;align-items:center;gap:7px;margin-bottom:6px;",
       tags$i(class = paste("fa", icon_name),
-             style = paste0("color:", color, ";font-size:12px;")),
-      tags$span(style="font-size:12px;font-weight:800;color:#e2e8f0;", name)
+             style = paste0("color:", color, ";font-size:14px;")),
+      tags$span(style="font-size:14px;font-weight:800;color:var(--text);", name)
     ),
-    tags$div(style=paste0("font-size:9px;font-weight:700;color:", color,
+    tags$div(style=paste0("font-size:11px;font-weight:700;color:", color,
                           ";background:", color, "22;display:inline-block;",
-                          "padding:2px 7px;border-radius:3px;margin-bottom:6px;"),
+                          "padding:3px 8px;border-radius:4px;margin-bottom:6px;"),
              type_label),
-    tags$div(style="font-size:11px;color:#94a3b8;line-height:1.5;", desc)
+    tags$div(style="font-size:12px;color:var(--text2);line-height:1.5;", desc)
   )
 }
 
@@ -295,7 +291,7 @@ homeServer <- function(id, weather_data, hourly_data = NULL) {
         fill     = TRUE
       )
     })
-    #weather_all_cities_20210101_20260804
+    
     output$box_models <- shinydashboard::renderInfoBox({
       shinydashboard::infoBox(
         title    = "مدل پیش‌بینی",
@@ -363,22 +359,22 @@ homeServer <- function(id, weather_data, hourly_data = NULL) {
       p %>% plotly::layout(
         paper_bgcolor = "rgba(0,0,0,0)",
         plot_bgcolor  = "rgba(0,0,0,0)",
-        font          = list(family = "Vazirmatn, Tahoma", color = "#94a3b8", size = 11),
+        font          = list(family = "Vazirmatn, Tahoma", color = "#94a3b8", size = 12),
         xaxis = list(
           title      = "",
           gridcolor  = "rgba(99,143,232,0.08)",
           linecolor  = "rgba(99,143,232,0.15)",
-          tickfont   = list(size = 10, color = "#64748b")
+          tickfont   = list(size = 11, color = "#94a3b8")
         ),
         yaxis = list(
           title      = "دما (°C)",
           gridcolor  = "rgba(99,143,232,0.08)",
           linecolor  = "rgba(99,143,232,0.15)",
-          tickfont   = list(size = 10, color = "#64748b"),
+          tickfont   = list(size = 11, color = "#94a3b8"),
           ticksuffix = "°"
         ),
         legend    = list(orientation = "h", y = -0.15, x = 0.5, xanchor = "center",
-                         font = list(size = 11)),
+                         font = list(size = 12, color = "#94a3b8")),
         hovermode = "x unified",
         margin    = list(l = 50, r = 10, t = 10, b = 40),
         shapes = list(list(
@@ -437,11 +433,11 @@ homeServer <- function(id, weather_data, hourly_data = NULL) {
         plotly::layout(
           paper_bgcolor = "rgba(0,0,0,0)",
           plot_bgcolor  = "rgba(0,0,0,0)",
-          font   = list(family = "Vazirmatn, Tahoma", color = "#94a3b8", size = 10),
+          font   = list(family = "Vazirmatn, Tahoma", color = "#94a3b8", size = 11),
           xaxis  = list(title = "", gridcolor = "transparent",
-                        tickfont = list(size = 9, color = "#64748b")),
+                        tickfont = list(size = 10, color = "#94a3b8")),
           yaxis  = list(title = "°C", gridcolor = "rgba(99,143,232,0.08)",
-                        tickfont = list(size = 9, color = "#64748b"),
+                        tickfont = list(size = 10, color = "#94a3b8"),
                         ticksuffix = "°"),
           bargap = 0.25,
           margin = list(l = 40, r = 5, t = 5, b = 40)
@@ -481,7 +477,7 @@ homeServer <- function(id, weather_data, hourly_data = NULL) {
         DT::formatStyle(
           "ایستگاه",
           fontWeight = "700",
-          color      = "#e2e8f0"
+          color      = "var(--text)"
         ) %>%
         DT::formatStyle(
           "میانگین دما",
@@ -542,12 +538,12 @@ homeServer <- function(id, weather_data, hourly_data = NULL) {
       p %>% plotly::layout(
         paper_bgcolor = "rgba(0,0,0,0)",
         plot_bgcolor  = "rgba(0,0,0,0)",
-        font    = list(family = "Vazirmatn, Tahoma", color = "#94a3b8", size = 10),
+        font    = list(family = "Vazirmatn, Tahoma", color = "#94a3b8", size = 11),
         xaxis   = list(title = "", gridcolor = "transparent",
-                       tickfont = list(size = 10, color = "#64748b")),
+                       tickfont = list(size = 11, color = "#94a3b8")),
         yaxis   = list(title = var_unit,
                        gridcolor = "rgba(99,143,232,0.08)",
-                       tickfont  = list(size = 10, color = "#64748b")),
+                       tickfont  = list(size = 11, color = "#94a3b8")),
         showlegend = FALSE,
         violingap  = 0.2,
         margin     = list(l = 45, r = 10, t = 10, b = 35)

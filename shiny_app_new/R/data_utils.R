@@ -251,3 +251,53 @@ station_summary <- function(df) {
     wind_avg     = round(mean(df$wind_speed,    na.rm = TRUE), 1)
   )
 }
+
+# ── پاکسازی عمیق و پیشرفته داده‌های سری زمانی ──────────────────────────────────
+advanced_clean_data <- function(df) {
+  # ۱. یکپارچگی زمانی: پیدا کردن روزهای جاافتاده
+  full_dates <- seq.Date(min(df$date), max(df$date), by = "day")
+  df <- df %>% 
+    dplyr::right_join(data.frame(date = full_dates), by = "date") %>% 
+    dplyr::arrange(date)
+  
+  # افزودن ماه برای بررسی فصلی
+  df$month <- lubridate::month(df$date)
+  
+  # ۲. تشخیص داده پرت زمینه‌ای (فصلی) با روش Z-Score
+  remove_contextual_outliers <- function(x, month, threshold = 3.5) {
+    # محاسبه میانگین و انحراف معیار برای هر ماه (نادیده گرفتن خود داده‌های پرت در محاسبه)
+    monthly_stats <- split(x, month)
+    means <- sapply(monthly_stats, mean, na.rm = TRUE)
+    sds <- sapply(monthly_stats, sd, na.rm = TRUE)
+    
+    # جایگزینی داده‌های پرت با NA
+    for (m in unique(month[!is.na(month)])) {
+      idx <- which(month == m)
+      z_score <- abs((x[idx] - means[as.character(m)]) / sds[as.character(m)])
+      z_score[is.na(z_score)] <- 0
+      x[idx][z_score > threshold] <- NA
+    }
+    return(x)
+  }
+  
+  df$temperature   <- remove_contextual_outliers(df$temperature, df$month)
+  df$humidity      <- remove_contextual_outliers(df$humidity, df$month)
+  df$wind_speed    <- remove_contextual_outliers(df$wind_speed, df$month)
+  df$precipitation <- remove_contextual_outliers(df$precipitation, df$month)
+  
+  # ۳. جبران‌سازی هوشمند (Imputation)
+  # برای دما و رطوبت: درون‌یابی خطی (Linear Interpolation)
+  df$temperature   <- zoo::na.approx(df$temperature, na.rm = FALSE)
+  df$humidity      <- zoo::na.approx(df$humidity, na.rm = FALSE)
+  
+  # برای بارش: روزهای خالی یعنی بارش صفر
+  df$precipitation[is.na(df$precipitation)] <- 0
+  
+  # برای سرعت باد: پر کردن با میانگین متحرک (Rolling Mean)
+  df$wind_speed <- zoo::na.fill(df$wind_speed, "extend")
+  
+  # حذف ستون کمکی ماه
+  df$month <- NULL
+  
+  return(df)
+}
