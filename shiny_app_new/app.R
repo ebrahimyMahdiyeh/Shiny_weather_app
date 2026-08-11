@@ -734,6 +734,7 @@ mg_metric_card <- function(icon, hex, title, formula_tex, desc, weight, note = N
 # UI
 # ══════════════════════════════════════════════════════════════════════════════
 ui <- shinydashboard::dashboardPage(
+  title = "سامانه پیش بینی آب و هوا",
   skin = "black",
   
   # ── هدر با دکمه تم در سمت چپ navbar ──────────────────────────────────────

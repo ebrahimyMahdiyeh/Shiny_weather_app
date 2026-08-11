@@ -1,4 +1,4 @@
-# File: modules/forecast_module.R  (نسخه نهایی پایدار + AutoML Ensemble پنهان)
+# File: modules/forecast_module.R  (نسخه نهایی پایدار + AutoML Ensemble)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Helperهای تبدیل کد و سرعت ──────────────────────────────────────────────
@@ -131,8 +131,7 @@ forecastUI <- function(id) {
         .fc-wrapper label { font-size: 14px !important; font-weight: 600; }
         .fc-wrapper .form-control, .fc-wrapper .selectize-input { font-size: 14px !important; }
 
-        /* Hero Card (کارت بالایی - همیشه تیره می‌ماند تا متن‌های سفید خوانا باشند) */
-                .weather-hero{
+        .weather-hero{
           background: var(--hero-grad);
           border:1px solid var(--border);
           border-radius:16px;
@@ -182,7 +181,6 @@ forecastUI <- function(id) {
           .hero-divider { display:none; }
         }
 
-        /* Hourly Cards */
         .hourly-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:thin;scrollbar-color:rgba(99,143,232,.15) transparent;direction:rtl;}
         .hourly-strip::-webkit-scrollbar{height:4px;}
         .hourly-strip::-webkit-scrollbar-thumb{background:rgba(99,143,232,.18);border-radius:2px;}
@@ -194,12 +192,10 @@ forecastUI <- function(id) {
         .hour-temp{font-size:18px;font-weight:800;color:var(--text);}
         .hour-prob{font-size:11px;color:#60a5fa;margin-top:3px;font-weight:600;}
 
-        /* Chart Boxes */
         .fc-chart-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
         .fc-section-lbl{font-size:13px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:7px;margin-bottom:12px;}
         .fc-section-lbl::after{content:'';flex:1;height:1px;background:var(--border);}
 
-        /* Week Mini */
         .week-mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;direction:rtl;}
         .wm-card{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
         .wm-card:hover{border-color:var(--border2);background:var(--hover-bg);}
@@ -214,11 +210,9 @@ forecastUI <- function(id) {
         .wm-bar{height:4px;border-radius:2px;margin:4px auto;width:75%;background:var(--border);overflow:hidden;position:relative;}
         .wm-bar-fill{height:100%;border-radius:2px;position:absolute;background:linear-gradient(90deg,#3b82f6,#f59e0b);}
 
-        /* Control Box */
         .fc-ctrl-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
         .fc-ctrl-lbl{font-size:13px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;}
         
-        /* Checkboxes */
         .mv-box{margin-top:10px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:10px;}
         .mv-box .form-group{margin-bottom:0;}
         .mv-box .checkbox{margin:0; padding:0; text-align:center;}
@@ -231,7 +225,6 @@ forecastUI <- function(id) {
         .mv-box.compare-box .checkbox input[type='checkbox']{accent-color:#22c55e;}
         .mv-box-disabled{margin-top:10px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;font-size:12px;color:var(--text3);display:flex;align-items:center;justify-content:center;gap:6px;}
         
-        /* Evaluation Table */
         .eval-container{margin-top:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:14px;}
         .eval-header{font-size:14px;font-weight:800;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
         .eval-header i{color:#22c55e;}
@@ -243,7 +236,6 @@ forecastUI <- function(id) {
         .eval-footer{display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:12px;margin-top:8px;color:var(--text2);font-size:13px;font-weight:600;}
         .eval-footer span{display:flex;align-items:center;gap:5px;}
         
-        /* Daily Comparison */
         .om-row{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(34,197,94,0.3);}
         .om-label{font-size:10px;color:#22c55e;font-weight:700;text-align:center;margin-bottom:3px;}
         .daily-comp-box{margin-top:15px;background:var(--panel2);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px;}
@@ -254,7 +246,6 @@ forecastUI <- function(id) {
         .comp-table td:first-child{text-align:right;color:var(--text2);}
         .comp-table td:last-child{text-align:center;font-weight:800;color:var(--text);font-size:16px;}
         
-        /* Model Selector Pills */
         .daily-model-selector { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
         .daily-pill {
           padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
@@ -409,7 +400,10 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     observeEvent(input$feat_imp_model_click, { feat_imp_selected_model(input$feat_imp_model_click) })
     
     run_hourly_pred <- function() {
-      sid    <- input$station %||% names(STATIONS)[1]
+      sid <- input$station
+      if (is.null(sid) || sid == "") {
+        sid <- names(STATIONS)[1]
+      }
       target <- input$target_var %||% "temperature"
       user_selected_models <- input$selected_models
       
@@ -421,10 +415,8 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       
       # ── مدیریت مدل انسمبل ──
       run_ensemble <- "ensemble" %in% user_selected_models
-      # مدل‌های پایه که انسمبل از روی آن‌ها ساخته می‌شود (پشت پرده اجرا می‌شوند)
       ENSEMBLE_BASE_MODELS <- c("arima", "ets", "xgboost", "lightgbm")
       
-      # مدل‌هایی که واقعاً باید در بک‌اند اجرا شوند
       if (run_ensemble) {
         models_to_run <- unique(c(user_selected_models[user_selected_models != "ensemble"], ENSEMBLE_BASE_MODELS))
       } else {
@@ -577,18 +569,13 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           }
         }
         
-        # ── محاسبه مدل ترکیبی (AutoML Ensemble) ──
         # ── محاسبه مدل ترکیبی هوشمند (Smart AutoML Ensemble) ──
         if (run_ensemble) {
-          # ۱. بررسی مدل‌های پایه که با موفقیت اجرا شده‌اند
           valid_models <- intersect(names(all_preds_24h), ENSEMBLE_BASE_MODELS)
           if (length(valid_models) >= 2) {
-            # استخراج خطای (RMSE) مدل‌ها
             rmses <- sapply(valid_models, function(mn) eval_metrics_list[[mn]]$rmse)
             rmses[is.na(rmses) | rmses == 0] <- 1e-6
             
-            # ── ایده ۱: فیلتر کردن مدل‌های ضعیف ──
-            # فقط مدل‌هایی که خطایشان حداکثر ۱.۵ برابر بهترین مدل است وارد ترکیب شوند
             min_rmse <- min(rmses)
             strong_models <- names(rmses)[rmses <= (min_rmse * 1.5)]
             if (length(strong_models) >= 2) {
@@ -596,13 +583,10 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               rmses <- rmses[valid_models]
             }
             
-            # ── ایده ۲: وزن‌دهی Softmax (تمرکز روی بهترین مدل) ──
-            # هرچه beta بیشتر باشد، تمرکز روی بهترین مدل بیشتر است (پیش‌فرض: 5)
             beta <- 5
             exp_vals <- exp(-beta * rmses)
             weights <- exp_vals / sum(exp_vals)
             
-            # پیش‌بینی ۲۴ ساعته انسمبل: ŷ = Σ(w_i × ŷ_i)
             ens_preds <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$preds * weights[mn]))
             ens_lower <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$lower * weights[mn]))
             ens_upper <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$upper * weights[mn]))
@@ -615,7 +599,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               color = MODEL_META$ensemble$color
             )
             
-            # پیش‌بینی ۷ روزه انسمبل
             valid_models_7d <- intersect(valid_models, names(all_preds_7d))
             if (length(valid_models_7d) >= 2) {
               n_days <- nrow(all_preds_7d[[ valid_models_7d[1] ]])
@@ -629,7 +612,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               )
             }
             
-            # ارزیابی انسمبل
             valid_eval_models <- intersect(valid_models, names(eval_preds_list))
             if (length(valid_eval_models) >= 2) {
               ens_eval_preds <- rowSums(sapply(valid_eval_models, function(mn) eval_preds_list[[mn]] * weights[mn]))
@@ -651,7 +633,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               }
             }
             
-            # اهمیت ویژگی‌های انسمبل
             valid_feat_models <- intersect(valid_models, names(all_feat_imp))
             if (length(valid_feat_models) > 0) {
               all_features <- unique(unlist(lapply(all_feat_imp[valid_feat_models], function(x) x[[1]])))
@@ -669,7 +650,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           }
         }
         
-        # ── فیلتر کردن خروجی‌ها: فقط مدل‌های انتخابی کاربر در UI نمایش داده شوند ──
         all_preds_24h <- all_preds_24h[names(all_preds_24h) %in% user_selected_models]
         eval_metrics_list <- eval_metrics_list[names(eval_metrics_list) %in% user_selected_models]
         all_preds_7d <- all_preds_7d[names(all_preds_7d) %in% user_selected_models]

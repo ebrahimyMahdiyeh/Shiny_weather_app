@@ -17,62 +17,74 @@
 # بخش ۱: مدل‌های کلاسیک سری زمانی (فقط برای انتخاب تکی — در AutoML نیستند)
 # ════════════════════════════════════════════════════════════════════════════
 
-# ── پیش‌بینی ARIMA ────────────────────────────────────────────────────────────
+# ── پیش‌بینی ARIMA (با استفاده از سری فوریه برای فصلیت سالانه) ────────────────
 forecast_arima <- function(train_df, horizon, target = "temperature") {
-  ts_data  <- prepare_ts_data(train_df, variable = target, freq = 7)
+  # محدود کردن داده به 3 سال اخیر (1095 روز) برای حفظ سرعت
+  n <- min(nrow(train_df), 1095)
+  recent_df <- tail(train_df, n)
   
-  if (length(ts_data) > 1095) {
-    ts_data <- tail(ts_data, 1095)
-    message("[ARIMA] محدود شد به ۱۰۹۵ روز آخر")
-  }
+  # ساخت سری زمانی با فرکانس سالانه
+  ts_data <- ts(recent_df[[target]], frequency = 365)
   
+  # تولید 5 جفت سینوسی/کوسینوسی برای مدل‌سازی فصلیت سالانه
+  K <- 5
+  xreg <- forecast::fourier(ts_data, K = K)
+  
+  # اجرای ARIMA با ورودی‌های فوریه (غیر فصلی، چون فصلیت توسط فوریه گرفته شده)
   fit <- tryCatch(
-    forecast::Arima(ts_data, order = c(1, 0, 1),
-                    seasonal = list(order = c(1, 0, 0), period = 7)),
-    error = function(e) forecast::auto.arima(
-      ts_data, seasonal = TRUE,
-      stepwise = TRUE, approximation = TRUE,
-      max.p = 5, max.q = 5, max.P = 1, max.Q = 1
-    )
+    forecast::auto.arima(ts_data, xreg = xreg, seasonal = FALSE, 
+                         stepwise = TRUE, approximation = TRUE),
+    error = function(e) forecast::Arima(ts_data, order = c(1,1,1), xreg = xreg)
   )
-  fc <- forecast::forecast(fit, h = horizon)
+  
+  # تولید داده‌های فوریه برای روزهای آینده (افق پیش‌بینی)
+  xreg_future <- forecast::fourier(ts_data, K = K, h = horizon)
+  fc <- forecast::forecast(fit, xreg = xreg_future)
+  
   list(
     model       = fit,
     predictions = as.numeric(fc$mean),
     lower       = as.numeric(fc$lower[, 2]),
     upper       = as.numeric(fc$upper[, 2]),
-    method      = "ARIMA"
+    method      = "ARIMA (Fourier)"
   )
 }
 
-# ── پیش‌بینی SARIMA ───────────────────────────────────────────────────────────
+# ── پیش‌بینی SARIMA (فصلیت هفتگی + سری فوریه سالانه) ─────────────────────────
 forecast_sarima <- function(train_df, horizon, target = "temperature") {
-  ts_data <- prepare_ts_data(train_df, variable = target, freq = 7)
+  # محدود کردن داده به 3 سال اخیر (1095 روز)
+  n <- min(nrow(train_df), 1095)
+  recent_df <- tail(train_df, n)
   
-  if (length(ts_data) > 1095) {
-    ts_data <- tail(ts_data, 1095)
-    message("[SARIMA] محدود شد به ۱۰۹۵ روز آخر")
-  }
+  # برای SARIMA، فرکانس را روی 7 (هفتگی) تنظیم می‌کنیم تا الگوی داخل هفته را بگیرد
+  ts_data <- ts(recent_df[[target]], frequency = 7)
   
+  # ساخت سری فوریه با فرکانس سالانه (برای گرفتن روند تابستان و زمستان)
+  ts_data_365 <- ts(recent_df[[target]], frequency = 365)
+  K <- 5
+  xreg <- forecast::fourier(ts_data_365, K = K)
+  
+  # اجرای SARIMA با فصلیت هفتگی + متغیرهای فوریه سالانه
   fit <- tryCatch(
-    forecast::Arima(ts_data, order = c(1, 0, 1),
-                    seasonal = list(order = c(1, 0, 1), period = 7)),
-    error = function(e) forecast::auto.arima(
-      ts_data, seasonal = TRUE,
-      stepwise = TRUE, approximation = TRUE,
-      max.p = 3, max.q = 3, max.P = 1, max.Q = 1
-    )
+    forecast::Arima(ts_data, order = c(1, 0, 1), 
+                    seasonal = list(order = c(1, 0, 1), period = 7), 
+                    xreg = xreg),
+    error = function(e) forecast::auto.arima(ts_data, xreg = xreg, seasonal = TRUE, 
+                                             stepwise = TRUE, approximation = TRUE)
   )
-  fc <- forecast::forecast(fit, h = horizon)
+  
+  # تولید داده‌های فوریه برای افق پیش‌بینی
+  xreg_future <- forecast::fourier(ts_data_365, K = K, h = horizon)
+  fc <- forecast::forecast(fit, xreg = xreg_future)
+  
   list(
     model       = fit,
     predictions = as.numeric(fc$mean),
     lower       = as.numeric(fc$lower[, 2]),
     upper       = as.numeric(fc$upper[, 2]),
-    method      = "SARIMA"
+    method      = "SARIMA (Fourier)"
   )
 }
-
 # ── پیش‌بینی ETS ──────────────────────────────────────────────────────────────
 forecast_ets <- function(train_df, horizon, target = "temperature") {
   ts_data <- prepare_ts_data(train_df, variable = target, freq = 7)
@@ -94,32 +106,36 @@ forecast_ets <- function(train_df, horizon, target = "temperature") {
 }
 
 # ── پیش‌بینی TBATS ────────────────────────────────────────────────────────────
+# ── پیش‌بینی TBATS (نسخه ارتقا یافته با پشتیبانی چندفصلی) ──────────────────────
 forecast_tbats <- function(train_df, horizon, target = "temperature") {
-  ts_data <- prepare_ts_data(train_df, variable = target, freq = 7)
+  # استفاده از msts برای تعریف همزمان فصلیت هفتگی (7) و سالانه (365.25)
+  # 365.25 بهتر است تا کبیسه‌ها هم در نظر گرفته شوند
+  msts_data <- forecast::msts(train_df[[target]], seasonal.periods = c(7, 365.25))
   
-  if (length(ts_data) > 730) {
-    ts_data <- tail(ts_data, 730)
-    message("[TBATS] محدود شد به ۷۳۰ روز آخر")
+  # محدود کردن داده به 3 سال اخیر (1095 روز) تا هم سرعت حفظ شود و هم 3 چرخه سالانه داشته باشیم
+  if (length(msts_data) > 1095) {
+    msts_data <- tail(msts_data, 1095)
+    message("[TBATS] محدود شد به ۱۰۹۵ روز آخر (۳ چرخه سالانه)")
   }
   
   fit <- tryCatch(
     forecast::tbats(
-      ts_data,
+      msts_data,
       use.parallel     = FALSE,
-      use.box.cox      = FALSE,
-      use.trend        = TRUE,
+      use.box.cox      = NULL,      # اجازه به مدل برای تصمیم‌گیری درباره Box-Cox
+      use.trend        = NULL,      # اجازه به مدل برای تشخیص روند
       use.damped.trend = NULL,
-      num.arma.errors  = 1
+      use.arma.errors  = TRUE       # استفاده از خطاهای ARMA برای دقت بالاتر
     ),
     error = function(e) {
-      message("[TBATS] خطا، استفاده از BATS به‌عنوان fallback")
+      message("[TBATS] خطا در همگرایی، استفاده از BATS به‌عنوان fallback")
       tryCatch(
         forecast::bats(
-          ts_data,
+          msts_data,
           use.parallel     = FALSE,
-          use.box.cox      = FALSE,
-          use.trend        = TRUE,
-          use.damped.trend = FALSE
+          use.box.cox      = NULL,
+          use.trend        = NULL,
+          use.damped.trend = NULL
         ),
         error = function(e2) NULL
       )
@@ -134,7 +150,7 @@ forecast_tbats <- function(train_df, horizon, target = "temperature") {
     predictions = as.numeric(fc$mean),
     lower       = as.numeric(fc$lower[, 2]),
     upper       = as.numeric(fc$upper[, 2]),
-    method      = if (inherits(fit, "tbats")) "TBATS" else "BATS (TBATS fallback)"
+    method      = ifelse(inherits(fit, "tbats"), "TBATS", "BATS (TBATS fallback)")
   )
 }
 

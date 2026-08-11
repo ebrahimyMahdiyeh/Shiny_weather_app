@@ -53,7 +53,7 @@ homeUI <- function(id) {
         ),
         width = 8, solidHeader = FALSE,
         tags$div(style="margin-bottom:10px;display:flex;gap:8px;align-items:center;",
-                 tags$span(style="font-size:12px;color:var(--text3);", "میانگین ماهانه دما · ۲۰۲۱–۲۰۲۵"),
+                 tags$span(style="font-size:12px;color:var(--text3);", "میانگین ماهانه دما · ۲۰۲۱–۲۰۲۶"),
                  tags$span(
                    style="background:var(--input-bg);color:var(--blue2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;",
                    "Open-Meteo API"

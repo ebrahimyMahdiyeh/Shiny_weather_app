@@ -1,4 +1,4 @@
-# File: modules/leaderboard_module.R  (نسخه کامل با UI + AutoML Ensemble + حذف TBATS + پشتیبانی تم)
+# File: modules/leaderboard_module.R  (نسخه کامل با UI + AutoML Ensemble + بازگشت TBATS)
 # ماژول رتبه‌بندی مدل‌ها — UI کامل + Server
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -169,11 +169,11 @@ leaderboardUI <- function(id) {
                       tags$div(class="lb-hero",
                                tags$div(class="badge",
                                         tags$i(class="fa fa-trophy"),
-                                        "Benchmark · ۱۱ مدل · مقایسه جامع" # آپدیت به 11 مدل
+                                        "Benchmark · ۱۲ مدل · مقایسه جامع" # آپدیت به 12 مدل
                                ),
                                tags$h2("رتبه‌بندی مدل‌های پیش‌بینی"),
                                tags$p(
-                                 "ارزیابی جامع ۱۱ مدل پیش‌بینی سری زمانی بر اساس ۵ معیار آماری",
+                                 "ارزیابی جامع ۱۲ مدل پیش‌بینی سری زمانی بر اساس ۵ معیار آماری",
                                  " (RMSE، MAE، MAPE، SMAPE، R²) و نمره ترکیبی.",
                                  " شامل تحلیل پایداری، زمان اجرا، توصیه‌گر هوشمند و Heatmap منطقه‌ای."
                                ),
@@ -366,9 +366,9 @@ leaderboardServer <- function(id, weather_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    # افزودن ensemble به لیست رنگ‌ها و نام مدل‌ها + حذف tbats
-    MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", svm="#ef4444", naive="#64748b", ensemble="#22c55e")
-    MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", svm="SVM", naive="Naïve", ensemble="AutoML Ensemble")
+    # افزودن ensemble و tbats به لیست رنگ‌ها و نام مدل‌ها
+    MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", tbats="#0d9488", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", svm="#ef4444", naive="#64748b", ensemble="#22c55e")
+    MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", tbats="TBATS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", svm="SVM", naive="Naïve", ensemble="AutoML Ensemble")
     ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
     
     observe({
@@ -397,8 +397,8 @@ leaderboardServer <- function(id, weather_data) {
           test_vals <- test_df[[target]]
           test_h <- nrow(test_df)
           
-          # 10 مدل پایه (tbats حذف شد)
-          model_names <- c("arima","sarima","ets","prophet","rf","xgboost","lightgbm","catboost","svm","naive")
+          # 11 مدل پایه (tbats بازگشت)
+          model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive")
           
           all_metrics <- list()
           all_speed <- list()
@@ -546,8 +546,8 @@ leaderboardServer <- function(id, weather_data) {
       req(weather_data(), input$target_var)
       target <- input$target_var
       stations <- names(weather_data())
-      # tbats حذف شد از این لیست هم
-      model_names <- c("arima","sarima","ets","prophet","rf","xgboost","lightgbm","catboost","svm","naive", "ensemble")
+      # tbats بازگشت به این لیست هم
+      model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive", "ensemble")
       
       withProgress(message="در حال اجرای بنچمارک منطقه‌ای (ایستگاه‌ها)...", value=0, {
         res_matrix <- matrix(NA_real_, nrow=length(model_names), ncol=length(stations))
