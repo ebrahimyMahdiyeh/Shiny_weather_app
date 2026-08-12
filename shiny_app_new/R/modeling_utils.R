@@ -329,7 +329,7 @@ forecast_xgboost <- function(train_df, horizon, target = "temperature") {
   
   params <- list(
     objective        = "reg:squarederror",
-    max_depth        = 6,
+    max_depth        = 8,
     eta              = 0.05,
     subsample        = 0.8,
     colsample_bytree = 0.8,
@@ -349,7 +349,7 @@ forecast_xgboost <- function(train_df, horizon, target = "temperature") {
       data                  = dtr,
       nrounds               = 500,
       watchlist             = list(train = dtr, valid = dva),
-      early_stopping_rounds = 20,
+      early_stopping_rounds = 50,
       verbose               = 0
     )
   } else {
@@ -394,7 +394,7 @@ forecast_lightgbm <- function(train_df, horizon, target = "temperature") {
     objective        = "regression",
     metric           = "rmse",
     num_leaves       = 31,
-    max_depth        = 6,
+    max_depth        = 8,
     learning_rate    = 0.05,
     feature_fraction = 0.8,
     bagging_fraction = 0.8,
@@ -415,7 +415,7 @@ forecast_lightgbm <- function(train_df, horizon, target = "temperature") {
       data                  = dtr,
       nrounds               = 500,
       valids                = list(valid = dva),
-      early_stopping_rounds = 20,
+      early_stopping_rounds = 50,
       verbose               = -1
     )
   } else {
@@ -466,7 +466,7 @@ forecast_catboost <- function(train_df, horizon, target = "temperature") {
   params <- list(
     loss_function    = "RMSE",
     iterations       = 500,
-    depth            = 6,
+    depth            = 8,
     learning_rate    = 0.05,
     l2_leaf_reg      = 3,
     logging_level    = "Silent"
@@ -477,7 +477,7 @@ forecast_catboost <- function(train_df, horizon, target = "temperature") {
       data  = as.data.frame(X_train[split$valid_idx, , drop = FALSE]),
       label = y_train[split$valid_idx]
     )
-    params$early_stopping_rounds <- 20
+    params$early_stopping_rounds <- 50
     fit <- catboost::catboost.train(train_pool, valid_pool, params = params)
   } else {
     params$iterations <- 150
@@ -564,7 +564,7 @@ forecast_naive <- function(train_df, horizon, target = "temperature") {
 run_model_by_name <- function(model_name, train_df, horizon,
                               target = "temperature") {
   model_name <- as.character(model_name)[1]
-
+  
   # ── پاک‌سازی کاراکترهای نامرئی (ZWNJ و类似的) ──────────────────────────────
   # مشکل: gsub با pattern فارسی روی ویندوز خطای "invalid UTF-8" می‌دهد.
   # راه‌حل: استفاده از useBytes=TRUE یا iconv با_substr مکرر.
@@ -580,11 +580,11 @@ run_model_by_name <- function(model_name, train_df, horizon,
   }, error = function(e) {
     message("Warning در پاک‌سازی نام مدل: ", e$message)
   })
-
+  
   model_name <- trimws(model_name)
   # اطمینان از اینکه فقط حروف ASCII انگلیسی باقی مانده
   model_name <- tolower(model_name)
-
+  
   fn <- switch(model_name,
                arima     = forecast_arima,
                sarima    = forecast_sarima,
@@ -937,7 +937,7 @@ forecast_hourly_xgboost <- function(hourly_df, horizon_h = 24, target = "tempera
     if (!is.null(split)) {
       dtr <- xgboost::xgb.DMatrix(X_train[split$train_idx, , drop = FALSE], label = y_train[split$train_idx])
       dva <- xgboost::xgb.DMatrix(X_train[split$valid_idx, , drop = FALSE], label = y_train[split$valid_idx])
-      model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 500, watchlist = list(train = dtr, valid = dva), early_stopping_rounds = 20, verbose = 0)
+      model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 500, watchlist = list(train = dtr, valid = dva), early_stopping_rounds = 50, verbose = 0)
     } else {
       dtr   <- xgboost::xgb.DMatrix(X_train, label = y_train)
       model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 100, verbose = 0)
@@ -997,7 +997,7 @@ forecast_hourly_lightgbm <- function(hourly_df, horizon_h = 24, target = "temper
     if (!is.null(split)) {
       dtr <- lightgbm::lgb.Dataset(X_train[split$train_idx, , drop = FALSE], label = y_train[split$train_idx])
       dva <- lightgbm::lgb.Dataset.create.valid(dtr, X_train[split$valid_idx, , drop = FALSE], label = y_train[split$valid_idx])
-      model <- lightgbm::lgb.train(params = params, data = dtr, nrounds = 500, valids = list(valid = dva), early_stopping_rounds = 20, verbose = -1)
+      model <- lightgbm::lgb.train(params = params, data = dtr, nrounds = 500, valids = list(valid = dva), early_stopping_rounds = 50, verbose = -1)
     } else {
       dtr   <- lightgbm::lgb.Dataset(X_train, label = y_train)
       model <- lightgbm::lgb.train(params = params, data = dtr, nrounds = 100, verbose = -1)
@@ -1035,7 +1035,7 @@ forecast_hourly_catboost <- function(hourly_df, horizon_h = 24, target = "temper
     
     if (!is.null(split)) {
       valid_pool <- catboost::catboost.load_pool(data = as.data.frame(X_train[split$valid_idx, , drop = FALSE]), label = y_train[split$valid_idx])
-      params$early_stopping_rounds <- 20
+      params$early_stopping_rounds <- 50
       model <- catboost::catboost.train(train_pool, valid_pool, params = params)
     } else {
       params$iterations <- 150

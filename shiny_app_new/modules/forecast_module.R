@@ -1,4 +1,4 @@
-# File: modules/forecast_module.R  (نسخه نهایی پایدار + AutoML Ensemble)
+# File: modules/forecast_module.R  (نسخه نهایی پایدار + AutoML Ensemble + ضدعفونی خروجی)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Helperهای تبدیل کد و سرعت ──────────────────────────────────────────────
@@ -114,6 +114,20 @@ fetch_hourly_forecast <- function(lat, lon, tz = "Asia/Tehran") {
     )
     list(hourly = hourly_df, daily = daily_df, current = current, tz = tz)
   }, error = function(e) { message("Open-Meteo error: ", e$message); NULL })
+}
+
+# ── تابع کمکی برای پاک‌سازی مقادیر نامعتبر (NaN, Inf) ──
+sanitize_vec <- function(v, len = NULL) {
+  v <- as.numeric(v)
+  if (any(!is.finite(v))) {
+    valid <- v[is.finite(v)]
+    rep_val <- if (length(valid) > 0) mean(valid, na.rm = TRUE) else 0
+    v[!is.finite(v)] <- rep_val
+  }
+  if (!is.null(len) && length(v) < len) {
+    v <- c(v, rep(v[length(v)], len - length(v)))
+  }
+  v
 }
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -508,15 +522,22 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             actual_vals <- actual_vals[1:len]; pred_vals <- pred_vals[1:len]
             valid <- !is.na(actual_vals) & !is.na(pred_vals)
             
+            # ── [FIX] فیلتر کردن مقادیر نامعتبر (NaN, Inf) که باعث خرابی ETS می‌شود ──
             if(sum(valid) > 2) {
               a <- as.numeric(actual_vals[valid]); p <- as.numeric(pred_vals[valid])
-              rmse_val <- sqrt(mean((a - p)^2))
-              mae_val <- mean(abs(a - p))
-              ss_res <- sum((a - p)^2)
-              ss_tot <- sum((a - mean(a))^2)
-              r2_val <- ifelse(ss_tot == 0, 0, 1 - (ss_res/ss_tot))
-              eval_metrics_list[[mn]] <- list(r2 = r2_val, rmse = rmse_val, mae = mae_val, color = MODEL_META[[mn]]$color)
-              eval_preds_list[[mn]] <- p 
+              finite_idx <- is.finite(a) & is.finite(p)
+              if (sum(finite_idx) > 2) {
+                a <- a[finite_idx]
+                p <- p[finite_idx]
+                
+                rmse_val <- sqrt(mean((a - p)^2))
+                mae_val <- mean(abs(a - p))
+                ss_res <- sum((a - p)^2)
+                ss_tot <- sum((a - mean(a))^2)
+                r2_val <- ifelse(ss_tot == 0, 0, 1 - (ss_res/ss_tot))
+                eval_metrics_list[[mn]] <- list(r2 = r2_val, rmse = rmse_val, mae = mae_val, color = MODEL_META[[mn]]$color)
+                eval_preds_list[[mn]] <- p 
+              }
             }
           }
         }
@@ -546,20 +567,39 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             idx_24_start <- gap_hours + 1
             idx_24_end <- gap_hours + 24
             
-            preds_24 <- res_final$predictions[idx_24_start:idx_24_end]
-            lower_24 <- if (!is.null(res_final$lower) && length(res_final$lower) >= idx_24_end) res_final$lower[idx_24_start:idx_24_end] else preds_24 - 1.5
-            upper_24 <- if (!is.null(res_final$upper) && length(res_final$upper) >= idx_24_end) res_final$upper[idx_24_start:idx_24_end] else preds_24 + 1.5
+            # ── [FIX] پاک‌سازی مقادیر نامعتبر (NaN, Inf) در پیش‌بینی‌ها ──
+            preds_24 <- sanitize_vec(res_final$predictions[idx_24_start:idx_24_end])
             
-            all_preds_24h[[mn]] <- list(preds = as.numeric(preds_24), lower = as.numeric(lower_24), upper = as.numeric(upper_24), method = MODEL_META[[mn]]$label, color = MODEL_META[[mn]]$color)
+            lower_24 <- if (!is.null(res_final$lower) && length(res_final$lower) >= idx_24_end) {
+              sanitize_vec(res_final$lower[idx_24_start:idx_24_end])
+            } else {
+              preds_24 - 1.5
+            }
+            upper_24 <- if (!is.null(res_final$upper) && length(res_final$upper) >= idx_24_end) {
+              sanitize_vec(res_final$upper[idx_24_start:idx_24_end])
+            } else {
+              preds_24 + 1.5
+            }
+            
+            # اطمینان از صحت بازه‌های اطمینان
+            lower_24 <- pmin(lower_24, preds_24)
+            upper_24 <- pmax(upper_24, preds_24)
+            
+            all_preds_24h[[mn]] <- list(preds = preds_24, lower = lower_24, upper = upper_24, method = MODEL_META[[mn]]$label, color = MODEL_META[[mn]]$color)
             
             if (is_7d_success) {
-              preds_168 <- res_7d$predictions[idx_24_start:(gap_hours + 168)]
+              preds_168 <- sanitize_vec(res_7d$predictions[idx_24_start:(gap_hours + 168)])
+              
               future_ts_7d <- seq(from = now_hour + 3600, by = 3600, length.out = 168)
-              df_agg <- data.frame(date = as.Date(future_ts_7d), val = as.numeric(preds_168))
+              df_agg <- data.frame(date = as.Date(future_ts_7d), val = preds_168)
               daily_agg <- df_agg %>%
                 dplyr::group_by(date) %>%
                 dplyr::summarise(max_val = max(val, na.rm=TRUE), min_val = min(val, na.rm=TRUE), .groups="drop") %>%
                 head(7)
+              
+              if (any(!is.finite(daily_agg$max_val))) daily_agg$max_val <- sanitize_vec(daily_agg$max_val)
+              if (any(!is.finite(daily_agg$min_val))) daily_agg$min_val <- sanitize_vec(daily_agg$min_val)
+              
               all_preds_7d[[mn]] <- daily_agg
             }
             
@@ -573,7 +613,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         if (run_ensemble) {
           valid_models <- intersect(names(all_preds_24h), ENSEMBLE_BASE_MODELS)
           if (length(valid_models) >= 2) {
-            rmses <- sapply(valid_models, function(mn) eval_metrics_list[[mn]]$rmse)
+            rmses <- sapply(valid_models, function(mn) if(!is.null(eval_metrics_list[[mn]]$rmse)) eval_metrics_list[[mn]]$rmse else 1e-6)
             rmses[is.na(rmses) | rmses == 0] <- 1e-6
             
             min_rmse <- min(rmses)
@@ -587,9 +627,9 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             exp_vals <- exp(-beta * rmses)
             weights <- exp_vals / sum(exp_vals)
             
-            ens_preds <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$preds * weights[mn]))
-            ens_lower <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$lower * weights[mn]))
-            ens_upper <- rowSums(sapply(valid_models, function(mn) all_preds_24h[[mn]]$upper * weights[mn]))
+            ens_preds <- rowSums(sapply(valid_models, function(mn) sanitize_vec(all_preds_24h[[mn]]$preds) * weights[mn]))
+            ens_lower <- rowSums(sapply(valid_models, function(mn) sanitize_vec(all_preds_24h[[mn]]$lower) * weights[mn]))
+            ens_upper <- rowSums(sapply(valid_models, function(mn) sanitize_vec(all_preds_24h[[mn]]$upper) * weights[mn]))
             
             all_preds_24h[["ensemble"]] <- list(
               preds = as.numeric(ens_preds),
@@ -602,8 +642,8 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             valid_models_7d <- intersect(valid_models, names(all_preds_7d))
             if (length(valid_models_7d) >= 2) {
               n_days <- nrow(all_preds_7d[[ valid_models_7d[1] ]])
-              ens_max <- rowSums(sapply(valid_models_7d, function(mn) all_preds_7d[[mn]]$max_val * weights[mn]))
-              ens_min <- rowSums(sapply(valid_models_7d, function(mn) all_preds_7d[[mn]]$min_val * weights[mn]))
+              ens_max <- rowSums(sapply(valid_models_7d, function(mn) sanitize_vec(all_preds_7d[[mn]]$max_val, n_days) * weights[mn]))
+              ens_min <- rowSums(sapply(valid_models_7d, function(mn) sanitize_vec(all_preds_7d[[mn]]$min_val, n_days) * weights[mn]))
               
               all_preds_7d[["ensemble"]] <- tibble::tibble(
                 date = all_preds_7d[[ valid_models_7d[1] ]]$date,
@@ -614,13 +654,14 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             
             valid_eval_models <- intersect(valid_models, names(eval_preds_list))
             if (length(valid_eval_models) >= 2) {
-              ens_eval_preds <- rowSums(sapply(valid_eval_models, function(mn) eval_preds_list[[mn]] * weights[mn]))
+              max_len <- max(sapply(valid_eval_models, function(mn) length(eval_preds_list[[mn]])))
+              ens_eval_preds <- rowSums(sapply(valid_eval_models, function(mn) sanitize_vec(eval_preds_list[[mn]], max_len) * weights[mn]))
               
               actual_vals <- eval_test[[target]]
               len <- min(length(actual_vals), length(ens_eval_preds))
               a <- as.numeric(actual_vals[1:len])
               p <- as.numeric(ens_eval_preds[1:len])
-              valid_idx <- !is.na(a) & !is.na(p)
+              valid_idx <- !is.na(a) & !is.na(p) & is.finite(a) & is.finite(p)
               
               if(sum(valid_idx) > 2) {
                 a_v <- a[valid_idx]; p_v <- p[valid_idx]
@@ -859,10 +900,15 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         if (length(mlp$preds_list) == 1) {
           m_name <- names(mlp$preds_list)[1]
           m_data <- mlp$preds_list[[m_name]]
+          
+          # ── [FIX] جلوگیری از شکست نمودار در صورت نبود lower/upper معتبر ──
+          m_lower <- if (!is.null(m_data$lower) && length(m_data$lower) == 24 && all(is.finite(m_data$lower))) m_data$lower else m_data$preds - 1.5
+          m_upper <- if (!is.null(m_data$upper) && length(m_data$upper) == 24 && all(is.finite(m_data$upper))) m_data$upper else m_data$preds + 1.5
+          
           p <- p %>%
-            plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_data$lower,
+            plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_lower,
                               line=list(color="transparent"), showlegend=FALSE, hoverinfo="skip") %>%
-            plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_data$upper,
+            plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_upper,
                               fill="tonexty", fillcolor=paste0(substr(m_data$color,1,7),"22"),
                               line=list(color="transparent"), name="بازه ۹۵٪",
                               hovertemplate=paste0("حد بالا: %{y:.1f}",unit,"<extra></extra>"))
@@ -1097,7 +1143,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       current_sel <- feat_imp_selected_model()
       if (is.null(current_sel) || !current_sel %in% names(feat_imps)) {
         feat_imp_selected_model(names(feat_imps)[1])
-        current_sel <- names(feat_imps)[1]
+        current_sel = names(feat_imps)[1]
       }
       
       pills <- lapply(names(feat_imps), function(mn) {
