@@ -1,4 +1,4 @@
-# File: modules/leaderboard_module.R  (نسخه کامل با UI + AutoML Ensemble + بازگشت TBATS)
+# File: modules/leaderboard_module.R  (نسخه ارتقا یافته: پیاده‌سازی کامل روی داده‌های ساعتی)
 # ماژول رتبه‌بندی مدل‌ها — UI کامل + Server
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -11,149 +11,49 @@ leaderboardUI <- function(id) {
     tags$div(class="lb-wrapper",
              tags$style(HTML("
         .lb-wrapper {
-          font-size: 18px; /* فونت پایه کلی به شدت افزایش یافت */
+          font-size: 18px;
           color: var(--text2);
         }
-        .lb-wrapper .box-title {
-          font-size: 20px !important;
-          font-weight: 800 !important;
-        }
-        .lb-wrapper .form-control, .lb-wrapper .selectize-input {
-          font-size: 16px !important;
-        }
-        .lb-wrapper label {
-          font-size: 16px !important;
-          font-weight: 600;
-        }
+        .lb-wrapper .box-title { font-size: 20px !important; font-weight: 800 !important; }
+        .lb-wrapper .form-control, .lb-wrapper .selectize-input { font-size: 16px !important; }
+        .lb-wrapper label { font-size: 16px !important; font-weight: 600; }
         
-        /* ─── افزایش شدید سایز فونت جداول ─── */
-        .lb-wrapper table.dataTable {
-          font-size: 17px !important;
-        }
-        .lb-wrapper table.dataTable thead th {
-          font-size: 18px !important;
-          font-weight: 800 !important;
-          color: var(--text) !important;
-          border-bottom: 2px solid var(--border) !important;
-        }
-        .lb-wrapper table.dataTable tbody td {
-          padding: 12px 8px !important;
-        }
+        .lb-wrapper table.dataTable { font-size: 17px !important; }
+        .lb-wrapper table.dataTable thead th { font-size: 18px !important; font-weight: 800 !important; color: var(--text) !important; border-bottom: 2px solid var(--border) !important; }
+        .lb-wrapper table.dataTable tbody td { padding: 12px 8px !important; }
 
         .lb-hero{
-          background: var(--hero-grad);
-          border:1px solid var(--border);
-          border-radius:16px;
-          padding:28px 32px;
-          margin-bottom:16px;
-          position:relative;
-          overflow:hidden;
+          background: var(--hero-grad); border:1px solid var(--border); border-radius:16px;
+          padding:28px 32px; margin-bottom:16px; position:relative; overflow:hidden;
         }
-        .lb-hero::before{
-          content:'';position:absolute;top:0;left:0;width:5px;height:100%;background:linear-gradient(to bottom,#3b82f6,#22c55e);
-        }
+        .lb-hero::before{ content:'';position:absolute;top:0;left:0;width:5px;height:100%;background:linear-gradient(to bottom,#3b82f6,#22c55e); }
         .lb-hero h2{margin:0 0 10px;color:var(--text);font-size:28px;font-weight:800;}
         .lb-hero p{margin:0 0 24px;color:var(--text2);font-size:16px;line-height:1.8;max-width:85%;}
-        .lb-hero .badge{
-          display:inline-flex;align-items:center;gap:6px;
-          background:var(--input-bg);
-          border:1px solid var(--border);
-          color:var(--blue2);border-radius:20px;
-          padding:8px 16px;font-size:14px;font-weight:700;
-          margin-bottom:14px;
-        }
+        .lb-hero .badge{ display:inline-flex;align-items:center;gap:6px; background:var(--input-bg); border:1px solid var(--border); color:var(--blue2);border-radius:20px; padding:8px 16px;font-size:14px;font-weight:700; margin-bottom:14px; }
 
-        .lb-hero-stats{
-          display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
-          padding-top:20px;
-          margin-top:10px;
-          border-top:1px solid var(--border);
-        }
-        .lb-hero-stat-item{
-          display:flex;align-items:center;gap:14px;
-          padding:16px 20px;
-          background:var(--panel2);
-          border-radius:12px;
-          border:1px solid var(--border);
-          box-shadow:0 4px 6px rgba(0,0,0,0.1);
-        }
-        .lb-hero-stat-icon{
-          width:50px;height:50px;
-          display:flex;align-items:center;justify-content:center;
-          border-radius:10px;
-          background:linear-gradient(135deg, rgba(59,130,246,0.2), rgba(34,197,94,0.2));
-          color:var(--blue2);
-          font-size:22px;
-        }
+        .lb-hero-stats{ display:grid;grid-template-columns:repeat(4,1fr);gap:16px; padding-top:20px; margin-top:10px; border-top:1px solid var(--border); }
+        .lb-hero-stat-item{ display:flex;align-items:center;gap:14px; padding:16px 20px; background:var(--panel2); border-radius:12px; border:1px solid var(--border); box-shadow:0 4px 6px rgba(0,0,0,0.1); }
+        .lb-hero-stat-icon{ width:50px;height:50px; display:flex;align-items:center;justify-content:center; border-radius:10px; background:linear-gradient(135deg, rgba(59,130,246,0.2), rgba(34,197,94,0.2)); color:var(--blue2); font-size:22px; }
         .lb-hero-stat-text{display:flex;flex-direction:column;}
         .lb-hero-stat-val{font-size:22px;font-weight:800;color:var(--text);line-height:1.2;}
         .lb-hero-stat-lbl{font-size:14px;color:var(--text2);margin-top:4px;font-weight:600;}
 
-        .lb-control-card{
-          background:var(--panel);border:1px solid var(--border);
-          border-radius:10px;padding:14px 16px;
-          font-size:16px;
-        }
+        .lb-control-card{ background:var(--panel);border:1px solid var(--border); border-radius:10px;padding:14px 16px; font-size:16px; }
 
-        .reco-card{
-          background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(59,130,246,.08));
-          border:1px solid var(--border2);
-          border-radius:12px;
-          padding:20px;
-          box-shadow:0 4px 15px rgba(0,0,0,0.2);
-          position:relative;
-          overflow:hidden;
-        }
-        .reco-card::before {
-          content:'';position:absolute;top:0;left:0;width:100%;height:5px;
-          background:linear-gradient(90deg, #22c55e, #3b82f6);
-        }
-        .reco-header{
-          font-size:16px;font-weight:800;color:#22c55e;
-          margin-bottom:14px;display:flex;align-items:center;gap:8px;
-          text-transform:uppercase;letter-spacing:0.5px;
-        }
-        .reco-model{
-          font-size:30px;font-weight:800;color:var(--text);
-          margin-bottom:12px;display:flex;align-items:center;gap:12px;
-        }
-        .reco-score{
-          display:inline-flex;align-items:center;gap:8px;
-          font-size:16px;color:#fbbf24;font-weight:700;
-          background:rgba(251,191,36,0.1);
-          padding:8px 16px;border-radius:20px;
-          border:1px solid rgba(251,191,36,0.2);
-          margin-bottom:18px;
-        }
-        .reco-why{
-          background:var(--panel2);
-          border-radius:8px;padding:14px 16px;margin-bottom:16px;
-        }
-        .reco-why div{
-          font-size:16px;color:var(--text2);margin:10px 0;
-          display:flex;align-items:center;gap:10px;
-        }
+        .reco-card{ background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(59,130,246,.08)); border:1px solid var(--border2); border-radius:12px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.2); position:relative; overflow:hidden; }
+        .reco-card::before { content:'';position:absolute;top:0;left:0;width:100%;height:5px; background:linear-gradient(90deg, #22c55e, #3b82f6); }
+        .reco-header{ font-size:16px;font-weight:800;color:#22c55e; margin-bottom:14px;display:flex;align-items:center;gap:8px; text-transform:uppercase;letter-spacing:0.5px; }
+        .reco-model{ font-size:30px;font-weight:800;color:var(--text); margin-bottom:12px;display:flex;align-items:center;gap:12px; }
+        .reco-score{ display:inline-flex;align-items:center;gap:8px; font-size:16px;color:#fbbf24;font-weight:700; background:rgba(251,191,36,0.1); padding:8px 16px;border-radius:20px; border:1px solid rgba(251,191,36,0.2); margin-bottom:18px; }
+        .reco-why{ background:var(--panel2); border-radius:8px;padding:14px 16px;margin-bottom:16px; }
+        .reco-why div{ font-size:16px;color:var(--text2);margin:10px 0; display:flex;align-items:center;gap:10px; }
         .reco-why i{color:#22c55e;font-size:16px;width:18px;text-align:center;}
-        .reco-alt{
-          font-size:15px;color:var(--text2);
-          padding-top:14px;border-top:1px dashed var(--border2);
-        }
-        .reco-alt-item {
-          display:flex;align-items:center;gap:10px;
-          margin-top:10px;background:var(--input-bg);
-          padding:12px 14px;border-radius:6px;
-          font-size:15px;
-        }
+        .reco-alt{ font-size:15px;color:var(--text2); padding-top:14px;border-top:1px dashed var(--border2); }
+        .reco-alt-item { display:flex;align-items:center;gap:10px; margin-top:10px;background:var(--input-bg); padding:12px 14px;border-radius:6px; font-size:15px; }
         .reco-alt-item i { font-size:16px; }
 
-        .stability-grid{
-          display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;
-        }
-        .stab-card{
-          background:var(--input-bg);
-          border:1px solid var(--border);
-          border-radius:6px;padding:10px 12px;text-align:center;
-        }
+        .stability-grid{ display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px; }
+        .stab-card{ background:var(--input-bg); border:1px solid var(--border); border-radius:6px;padding:10px 12px;text-align:center; }
         .stab-val{font-size:20px;font-weight:800;color:#22c55e;}
         .stab-lbl{font-size:12px;color:var(--text3);margin-top:2px;}
 
@@ -163,195 +63,95 @@ leaderboardUI <- function(id) {
         .speed-fill{height:100%;border-radius:5px;transition:width .3s ease;}
       ")),
              
-             # ── Hero Banner + Stats (یکپارچه) ────────────────────────────────────────
              fluidRow(
                column(12,
                       tags$div(class="lb-hero",
-                               tags$div(class="badge",
-                                        tags$i(class="fa fa-trophy"),
-                                        "Benchmark · ۱۲ مدل · مقایسه جامع" # آپدیت به 12 مدل
-                               ),
+                               tags$div(class="badge", tags$i(class="fa fa-trophy"), "Benchmark · ۱۲ مدل · ارزیابی روی داده ساعتی"),
                                tags$h2("رتبه‌بندی مدل‌های پیش‌بینی"),
-                               tags$p(
-                                 "ارزیابی جامع ۱۲ مدل پیش‌بینی سری زمانی بر اساس ۵ معیار آماری",
-                                 " (RMSE، MAE، MAPE، SMAPE، R²) و نمره ترکیبی.",
-                                 " شامل تحلیل پایداری، زمان اجرا، توصیه‌گر هوشمند و Heatmap منطقه‌ای."
-                               ),
+                               tags$p("ارزیابی جامع ۱۲ مدل بر اساس ۷۲ ساعت آینده (افق ۳ روزه) دقیقاً مشابه تب پیش‌بینی."),
                                uiOutput(ns("lb_stats_ui"))
                       )
                )
              ),
              
-             # ── پنل کنترل (تنظیمات) + توصیه‌گر هوشمند ─────────────────────────────────────
              fluidRow(
                column(3,
                       shinydashboard::box(
-                        title = tags$span(
-                          tags$i(class="fa fa-sliders", style="margin-left:6px;color:var(--blue2);"),
-                          "تنظیمات Benchmark"
-                        ),
+                        title = tags$span(tags$i(class="fa fa-sliders", style="margin-left:6px;color:var(--blue2);"), "تنظیمات Benchmark"),
                         width = 12, solidHeader = FALSE, status = "primary",
-                        
-                        selectInput(ns("station"),
-                                    label = "ایستگاه:",
-                                    choices = NULL
-                        ),
-                        selectInput(ns("target_var"),
-                                    label = "متغیر هدف:",
-                                    choices = c(
-                                      "دما (°C)"        = "temperature",
-                                      "رطوبت (%)"       = "humidity",
-                                      "سرعت باد (km/h)" = "wind_speed",
-                                      "بارش (mm)"       = "precipitation"
-                                    )
-                        ),
-                        sliderInput(ns("test_ratio"),
-                                    label = "نسبت داده آزمون:",
-                                    min = 0.10, max = 0.30, value = 0.15, step = 0.05
-                        ),
+                        selectInput(ns("station"), label = "ایستگاه:", choices = NULL),
+                        selectInput(ns("target_var"), label = "متغیر هدف:", choices = c("دما (°C)"="temperature","رطوبت (%)"="humidity","سرعت باد (km/h)"="wind_speed","بارش (mm)"="precipitation")),
                         hr(),
-                        actionButton(ns("run_benchmark"),
-                                     label = tagList(tags$i(class="fa fa-play"), " اجرای Benchmark"),
-                                     class = "btn-primary btn-block",
-                                     style = "background:#3b82f6;border:none;color:white;font-weight:800;padding:14px;font-size:17px;"
-                        ),
+                        actionButton(ns("run_benchmark"), label = tagList(tags$i(class="fa fa-play"), " اجرای Benchmark"), class = "btn-primary btn-block", style = "background:#3b82f6;border:none;color:white;font-weight:800;padding:14px;font-size:17px;"),
                         hr(),
-                        tags$div(class="lb-control-card",
-                                 tags$div(style="font-size:14px;color:var(--text3);margin-bottom:6px;",
-                                          "زمان کل اجرا:"),
-                                 uiOutput(ns("bench_time_val"))
-                        )
+                        tags$div(class="lb-control-card", tags$div(style="font-size:14px;color:var(--text3);margin-bottom:6px;", "زمان کل اجرا:"), uiOutput(ns("bench_time_val")))
                       ),
-                      
-                      # ── کارت توصیه‌گر هوشمند ─────────────────────────────────────────────
                       shinydashboard::box(
-                        title = tags$span(
-                          tags$i(class="fa fa-award", style="margin-left:6px;color:#22c55e;"),
-                          "توصیه‌گر هوشمند"
-                        ),
+                        title = tags$span(tags$i(class="fa fa-award", style="margin-left:6px;color:#22c55e;"), "توصیه‌گر هوشمند"),
                         width = 12, solidHeader = FALSE, status = "success",
-                        shinycssloaders::withSpinner(
-                          uiOutput(ns("recommendation_card")),
-                          type = 8, color = "#22c55e", size = 0.6
-                        )
+                        shinycssloaders::withSpinner(uiOutput(ns("recommendation_card")), type = 8, color = "#22c55e", size = 0.6)
                       )
                ),
-               
-               # ── جدول رتبه‌بندی اصلی ──────────────────────────────────────────────────
                column(9,
                       fluidRow(
                         column(12,
                                shinydashboard::box(
-                                 title = tags$span(
-                                   tags$i(class="fa fa-list-ol", style="margin-left:6px;color:#fbbf24;"),
-                                   "جدول رتبه‌بندی اصلی"
-                                 ),
+                                 title = tags$span(tags$i(class="fa fa-list-ol", style="margin-left:6px;color:#fbbf24;"), "جدول رتبه‌بندی اصلی"),
                                  width = 12, solidHeader = FALSE, status = "warning",
-                                 shinycssloaders::withSpinner(
-                                   DT::DTOutput(ns("leaderboard_table")),
-                                   type = 8, color = "#f59e0b", size = 0.6
-                                 )
+                                 shinycssloaders::withSpinner(DT::DTOutput(ns("leaderboard_table")), type = 8, color = "#f59e0b", size = 0.6)
                                )
                         )
                       ),
-                      
-                      # ── نمودار میله‌ای + Trade-off ────────────────────────────────────────
                       fluidRow(
                         column(6,
                                shinydashboard::box(
-                                 title = tags$span(
-                                   tags$i(class="fa fa-chart-bar", style="margin-left:6px;color:var(--blue2);"),
-                                   "مقایسه معیارها"
-                                 ),
+                                 title = tags$span(tags$i(class="fa fa-chart-bar", style="margin-left:6px;color:var(--blue2);"), "مقایسه معیارها"),
                                  width = 12, solidHeader = FALSE, status = "primary",
-                                 selectInput(ns("metric_to_plot"),
-                                             label = "معیار:",
-                                             choices = c("RMSE", "MAE", "MAPE", "SMAPE", "R2"),
-                                             selected = "RMSE"
-                                 ),
-                                 shinycssloaders::withSpinner(
-                                   plotly::plotlyOutput(ns("metric_bar_chart"), height = "300px"),
-                                   type = 8, color = "#3b82f6", size = 0.6
-                                 )
+                                 selectInput(ns("metric_to_plot"), label = "معیار:", choices = c("RMSE", "MAE", "MAPE", "SMAPE", "R2"), selected = "RMSE"),
+                                 shinycssloaders::withSpinner(plotly::plotlyOutput(ns("metric_bar_chart"), height = "300px"), type = 8, color = "#3b82f6", size = 0.6)
                                )
                         ),
                         column(6,
                                shinydashboard::box(
-                                 title = tags$span(
-                                   tags$i(class="fa fa-arrows-left-right", style="margin-left:6px;color:#a78bfa;"),
-                                   "Trade-off: سرعت ↔ دقت"
-                                 ),
+                                 title = tags$span(tags$i(class="fa fa-arrows-left-right", style="margin-left:6px;color:#a78bfa;"), "Trade-off: سرعت ↔ دقت"),
                                  width = 12, solidHeader = FALSE, status = "primary",
-                                 shinycssloaders::withSpinner(
-                                   plotly::plotlyOutput(ns("tradeoff_scatter"), height = "344px"),
-                                   type = 8, color = "#8b5cf6", size = 0.6
-                                 )
+                                 shinycssloaders::withSpinner(plotly::plotlyOutput(ns("tradeoff_scatter"), height = "344px"), type = 8, color = "#8b5cf6", size = 0.6)
                                )
                         )
                       )
                )
              ),
              
-             # ── تحلیل پایداری + سرعت ────────────────────────────────────────────────
              fluidRow(
                column(6,
                       shinydashboard::box(
-                        title = tags$span(
-                          tags$i(class="fa fa-shield-halved", style="margin-left:6px;color:#22c55e;"),
-                          "تحلیل پایداری مدل‌ها"
-                        ),
+                        title = tags$span(tags$i(class="fa fa-shield-halved", style="margin-left:6px;color:#22c55e;"), "تحلیل پایداری مدل‌ها"),
                         width = 12, solidHeader = FALSE, status = "success",
-                        tags$div(style="font-size:14px;color:var(--text3);margin-bottom:10px;",
-                                 "رتبه‌بندی مدل‌ها در ۳ پنجره زمانی مختلف — پایداری = عملکرد ثابت در طول زمان"),
-                        shinycssloaders::withSpinner(
-                          uiOutput(ns("stability_cards_ui")),
-                          type = 8, color = "#22c55e", size = 0.6
-                        ),
-                        shinycssloaders::withSpinner(
-                          plotly::plotlyOutput(ns("stability_plot"), height = "280px"),
-                          type = 8, color = "#22c55e", size = 0.6
-                        )
+                        tags$div(style="font-size:14px;color:var(--text3);margin-bottom:10px;", "رتبه‌بندی در ۳ پنجره زمانی مختلف — پایداری = عملکرد ثابت در طول زمان"),
+                        shinycssloaders::withSpinner(uiOutput(ns("stability_cards_ui")), type = 8, color = "#22c55e", size = 0.6),
+                        shinycssloaders::withSpinner(plotly::plotlyOutput(ns("stability_plot"), height = "280px"), type = 8, color = "#22c55e", size = 0.6)
                       )
                ),
                column(6,
                       shinydashboard::box(
-                        title = tags$span(
-                          tags$i(class="fa fa-gauge-high", style="margin-left:6px;color:#fbbf24;"),
-                          "زمان اجرای مدل‌ها"
-                        ),
+                        title = tags$span(tags$i(class="fa fa-gauge-high", style="margin-left:6px;color:#fbbf24;"), "زمان اجرای مدل‌ها"),
                         width = 12, solidHeader = FALSE, status = "warning",
-                        tags$div(style="font-size:14px;color:var(--text3);margin-bottom:10px;",
-                                 "مدت زمان آموزش هر مدل (ثانیه) — برای مقاینه سرعت نسبی"),
-                        shinycssloaders::withSpinner(
-                          uiOutput(ns("speed_bars_ui")),
-                          type = 8, color = "#f59e0b", size = 0.6
-                        )
+                        tags$div(style="font-size:14px;color:var(--text3);margin-bottom:10px;", "مدت زمان آموزش هر مدل (ثانیه)"),
+                        shinycssloaders::withSpinner(uiOutput(ns("speed_bars_ui")), type = 8, color = "#f59e0b", size = 0.6)
                       )
                )
              ),
              
-             # ── Heatmap منطقه‌ای ──────────────────────────────────────────────────────
              fluidRow(
                column(12,
                       shinydashboard::box(
-                        title = tags$span(
-                          tags$i(class="fa fa-map-location-dot", style="margin-left:6px;color:#14b8a6;"),
-                          "Heatmap منطقه‌ای — مقایسه RMSE در ایستگاه‌ها"
-                        ),
+                        title = tags$span(tags$i(class="fa fa-map-location-dot", style="margin-left:6px;color:#14b8a6;"), "Heatmap منطقه‌ای — مقایسه RMSE در ایستگاه‌ها"),
                         width = 12, solidHeader = FALSE, status = "info",
                         tags$div(style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;",
-                                 tags$div(style="font-size:14px;color:var(--text3);",
-                                          "اجرای Benchmark برای همه ایستگاه‌ها با همه مدل‌ها — مقایسه عملکرد منطقه‌ای"),
-                                 actionButton(ns("run_regional"),
-                                              label = tagList(tags$i(class="fa fa-play"), " اجرای Heatmap منطقه‌ای"),
-                                              class = "btn-info btn-sm",
-                                              style = "background:#14b8a6;border:none;color:white;font-weight:700;padding:12px 18px;font-size:15px;"
-                                 )
+                                 tags$div(style="font-size:14px;color:var(--text3);", "اجرای Benchmark ساعتی برای همه ایستگاه‌ها"),
+                                 actionButton(ns("run_regional"), label = tagList(tags$i(class="fa fa-play"), " اجرای Heatmap منطقه‌ای"), class = "btn-info btn-sm", style = "background:#14b8a6;border:none;color:white;font-weight:700;padding:12px 18px;font-size:15px;")
                         ),
-                        shinycssloaders::withSpinner(
-                          plotly::plotlyOutput(ns("regional_heatmap"), height = "370px"),
-                          type = 8, color = "#14b8a6", size = 0.6
-                        )
+                        shinycssloaders::withSpinner(plotly::plotlyOutput(ns("regional_heatmap"), height = "370px"), type = 8, color = "#14b8a6", size = 0.6)
                       )
                )
              )
@@ -360,13 +160,12 @@ leaderboardUI <- function(id) {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
-# Server
+# Server (مبتنی بر داده‌های ساعتی - دقیقا مانند تب پیش‌بینی)
 # ════════════════════════════════════════════════════════════════════════════
 leaderboardServer <- function(id, weather_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    # افزودن ensemble و tbats به لیست رنگ‌ها و نام مدل‌ها
     MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", tbats="#0d9488", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", svm="#ef4444", naive="#64748b", ensemble="#22c55e")
     MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", tbats="TBATS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", svm="SVM", naive="Naïve", ensemble="AutoML Ensemble")
     ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
@@ -385,26 +184,30 @@ leaderboardServer <- function(id, weather_data) {
       target <- input$target_var
       req(sid %in% names(weather_data()))
       
-      df <- weather_data()[[sid]] %>% dplyr::arrange(date) %>% dplyr::filter(!is.na(.data[[target]]))
-      if (nrow(df) < 90) { showNotification("برای تحلیل پایداری حداقل ۹۰ روز داده نیاز است.", type="error"); return() }
+      # استفاده از timestamp برای داده ساعتی
+      df <- weather_data()[[sid]] %>% dplyr::arrange(timestamp) %>% dplyr::filter(!is.na(.data[[target]]))
       
-      withProgress(message="در حال ارزیابی مدل‌ها...", value=0, {
+      if (nrow(df) < 240) { showNotification("برای بنچمارک ساعتی حداقل ۲۴۰ ساعت (۱۰ روز) داده نیاز است.", type="error"); return() }
+      
+      withProgress(message="در حال ارزیابی مدل‌های ساعتی...", value=0, {
         tryCatch({
           start_time <- Sys.time()
-          splits <- train_test_split(df, test_ratio=input$test_ratio)
-          train_df <- splits$train
-          test_df <- splits$test
-          test_vals <- test_df[[target]]
-          test_h <- nrow(test_df)
           
-          # 11 مدل پایه (tbats بازگشت)
+          # افق پیش‌بینی ۷۲ ساعت (۳ روز)
+          test_h <- 72
+          if (nrow(df) <= test_h) test_h <- floor(nrow(df) / 4)
+          
+          train_df <- head(df, nrow(df) - test_h)
+          test_df <- tail(df, test_h)
+          test_vals <- test_df[[target]]
+          
+          # ۱۱ مدل پایه
           model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive")
           
           all_metrics <- list()
           all_speed <- list()
-          all_preds_list <- list() # برای ساخت انسمبل
+          all_preds_list <- list() 
           
-          # اضافه کردن ردیف برای انسمبل در ماتریس پایداری
           window_rmses <- matrix(NA_real_, nrow=length(model_names)+1, ncol=3)
           rownames(window_rmses) <- c(model_names, "ensemble")
           
@@ -413,15 +216,14 @@ leaderboardServer <- function(id, weather_data) {
           # ── ۱. ارزیابی مدل‌های پایه ──
           for (i in seq_along(model_names)) {
             mn <- model_names[i]
-            setProgress((i-1)/(length(model_names)+1), paste("آموزش:", MODEL_LABELS[[mn]]))
+            setProgress((i-1)/(length(model_names)+1), paste("آموزش ساعتی:", MODEL_LABELS[[mn]]))
             
             t_start <- Sys.time()
+            
+            # استفاده از run_hourly_model دقیقا مثل تب پیش‌بینی
             fc <- tryCatch(
-              run_model_by_name(mn, train_df, test_h, target),
-              error = function(e) {
-                message("خطا در مدل ", mn, ": ", conditionMessage(e))
-                NULL
-              }
+              run_hourly_model(mn, train_df, test_h, target),
+              error = function(e) { message("خطا در مدل ", mn, ": ", e$message); NULL }
             )
             t_end <- Sys.time()
             exec_time <- as.numeric(difftime(t_end, t_start, units = "secs"))
@@ -430,21 +232,30 @@ leaderboardServer <- function(id, weather_data) {
               preds <- fc$predictions[seq_len(min(test_h, length(fc$predictions)))]
               actual <- test_vals[seq_len(length(preds))]
               
-              m <- compute_all_metrics(actual, preds, model_name=mn)
-              all_metrics[[mn]] <- m
+              # فیلتر مقادیر نامعتبر
+              actual <- as.numeric(actual)
+              preds <- as.numeric(preds)
+              valid <- !is.na(actual) & !is.na(preds) & is.finite(actual) & is.finite(preds)
+              
+              if(sum(valid) > 2) {
+                m <- compute_all_metrics(actual[valid], preds[valid], model_name=mn)
+                all_metrics[[mn]] <- m
+              } else {
+                all_metrics[[mn]] <- tibble::tibble(model=mn, RMSE=NA_real_, MAE=NA_real_, MAPE=NA_real_, R2=NA_real_, SMAPE=NA_real_)
+              }
               all_speed[[mn]] <- tibble::tibble(model_id = mn, exec_time = round(exec_time, 3))
               
-              # پد کردن پیش‌بینی‌ها برای انسمبل
               preds_padded <- rep(NA_real_, test_h)
-              preds_padded[seq_along(preds)] <- as.numeric(preds)
+              preds_padded[seq_along(preds)] <- preds
               all_preds_list[[mn]] <- preds_padded
               
               for(w in 1:3) {
                 start_idx <- (w-1)*window_size + 1
                 end_idx <- if(w==3) test_h else (w*window_size)
-                w_actual <- as.numeric(actual[start_idx:end_idx])
-                w_preds <- as.numeric(preds[start_idx:end_idx])
-                w_rmse <- sqrt(mean((w_actual - w_preds)^2, na.rm=TRUE))
+                w_actual <- actual[start_idx:end_idx]
+                w_preds <- preds[start_idx:end_idx]
+                w_valid <- !is.na(w_actual) & !is.na(w_preds) & is.finite(w_actual) & is.finite(w_preds)
+                w_rmse <- if(sum(w_valid)>0) sqrt(mean((w_actual[w_valid] - w_preds[w_valid])^2)) else NA
                 window_rmses[mn, w] <- w_rmse
               }
             } else {
@@ -453,21 +264,19 @@ leaderboardServer <- function(id, weather_data) {
             }
           }
           
-          # ── ۲. محاسبه انسمبل هوشمند (Softmax Ensemble) ──
+          # ── ۲. محاسبه انسمبل هوشمند ──
           setProgress(0.95, "ساخت مدل ترکیبی (Ensemble)")
           if (length(all_preds_list) >= 2) {
-            # محاسبه RMSE برای مدل‌های موفق
             ens_rmses <- sapply(names(all_preds_list), function(mn) {
               p <- as.numeric(all_preds_list[[mn]])
               a <- as.numeric(test_vals)
-              valid <- !is.na(a) & !is.na(p)
+              valid <- !is.na(a) & !is.na(p) & is.finite(a) & is.finite(p)
               if(sum(valid) < 2) return(NA)
               sqrt(mean((a[valid] - p[valid])^2))
             })
             ens_rmses <- ens_rmses[!is.na(ens_rmses)]
             
             if(length(ens_rmses) >= 2) {
-              # فیلتر مدل‌های ضعیف
               min_rmse <- min(ens_rmses)
               strong_models <- names(ens_rmses)[ens_rmses <= (min_rmse * 1.5)]
               if (length(strong_models) >= 2) {
@@ -476,30 +285,29 @@ leaderboardServer <- function(id, weather_data) {
                 valid_models <- names(ens_rmses)
               }
               
-              # وزن‌دهی Softmax
               beta <- 5
               exp_vals <- exp(-beta * ens_rmses[valid_models])
               weights <- exp_vals / sum(exp_vals)
               
-              # ترکیب پیش‌بینی‌ها
               ens_preds <- rowSums(sapply(valid_models, function(mn) as.numeric(all_preds_list[[mn]]) * weights[mn]), na.rm=TRUE)
               ens_actual <- as.numeric(test_vals)
               
-              # متریک‌های انسمبل
-              m_ens <- compute_all_metrics(ens_actual, ens_preds, model_name="ensemble")
-              all_metrics[["ensemble"]] <- m_ens
+              valid_ens <- !is.na(ens_actual) & !is.na(ens_preds) & is.finite(ens_actual) & is.finite(ens_preds)
+              if(sum(valid_ens) > 2) {
+                m_ens <- compute_all_metrics(ens_actual[valid_ens], ens_preds[valid_ens], model_name="ensemble")
+                all_metrics[["ensemble"]] <- m_ens
+              }
               
-              # زمان اجرای انسمبل (مجموع مدل‌های پایه)
               ens_time <- sum(sapply(valid_models, function(mn) all_speed[[mn]]$exec_time), na.rm=TRUE)
               all_speed[["ensemble"]] <- tibble::tibble(model_id="ensemble", exec_time=round(ens_time, 3))
               
-              # پنجره‌های پایداری برای انسمبل
               for(w in 1:3) {
                 start_idx <- (w-1)*window_size + 1
                 end_idx <- if(w==3) test_h else (w*window_size)
                 w_actual <- ens_actual[start_idx:end_idx]
                 w_preds <- ens_preds[start_idx:end_idx]
-                w_rmse <- sqrt(mean((w_actual - w_preds)^2, na.rm=TRUE))
+                w_valid <- is.finite(w_actual) & is.finite(w_preds)
+                w_rmse <- if(sum(w_valid)>0) sqrt(mean((w_actual[w_valid] - w_preds[w_valid])^2)) else NA
                 window_rmses["ensemble", w] <- w_rmse
               }
             }
@@ -531,11 +339,11 @@ leaderboardServer <- function(id, weather_data) {
             info = list(n_models = length(ranked$model), test_size = test_h, exec_time = total_time, station = STATIONS[[sid]]$name, target = target)
           ))
           
-          setProgress(1, "Benchmark کامل شد!")
-          showNotification("Benchmark با موفقیت انجام شد ✓", type="message")
+          setProgress(1, "Benchmark ساعتی کامل شد!")
+          showNotification("بنچمارک ساعتی با موفقیت انجام شد ✓", type="message")
           
         }, error = function(e) {
-          showNotification(paste("خطا در Benchmark:", conditionMessage(e)), type="error")
+          showNotification(paste("خطا در Benchmark ساعتی:", conditionMessage(e)), type="error")
         })
       })
     })
@@ -546,10 +354,9 @@ leaderboardServer <- function(id, weather_data) {
       req(weather_data(), input$target_var)
       target <- input$target_var
       stations <- names(weather_data())
-      # tbats بازگشت به این لیست هم
       model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive", "ensemble")
       
-      withProgress(message="در حال اجرای بنچمارک منطقه‌ای (ایستگاه‌ها)...", value=0, {
+      withProgress(message="در حال اجرای بنچمارک منطقه‌ای ساعتی...", value=0, {
         res_matrix <- matrix(NA_real_, nrow=length(model_names), ncol=length(stations))
         rownames(res_matrix) <- sapply(model_names, function(m) MODEL_LABELS[[m]])
         colnames(res_matrix) <- sapply(stations, function(s) STATIONS[[s]]$name)
@@ -557,21 +364,22 @@ leaderboardServer <- function(id, weather_data) {
         for(i in seq_along(stations)) {
           sid <- stations[i]
           df <- weather_data()[[sid]] %>% dplyr::filter(!is.na(.data[[target]]))
-          if (nrow(df) < 60) next
-          splits <- train_test_split(df, test_ratio=0.15)
-          test_h_reg <- nrow(splits$test)
+          if (nrow(df) < 240) next
+          
+          test_h_reg <- 72
+          train_df_reg <- head(df, nrow(df) - test_h_reg)
+          test_df_reg <- tail(df, test_h_reg)
           station_preds <- list()
           
           for(j in seq_along(model_names)) {
             mn <- model_names[j]
             
-            # محاسبه انسمبل برای ایستگاه
             if (mn == "ensemble") {
               if (length(station_preds) >= 2) {
                 ens_rmses <- sapply(names(station_preds), function(mn2) {
                   p <- as.numeric(station_preds[[mn2]])
-                  a <- as.numeric(splits$test[[target]])
-                  valid <- !is.na(a) & !is.na(p)
+                  a <- as.numeric(test_df_reg[[target]])
+                  valid <- !is.na(a) & !is.na(p) & is.finite(a) & is.finite(p)
                   if(sum(valid) < 2) return(NA)
                   sqrt(mean((a[valid] - p[valid])^2))
                 })
@@ -585,25 +393,23 @@ leaderboardServer <- function(id, weather_data) {
                   w <- exp(-beta * ens_rmses[valid_m]) / sum(exp(-beta * ens_rmses[valid_m]))
                   ens_p <- rowSums(sapply(valid_m, function(mn2) as.numeric(station_preds[[mn2]]) * w[mn2]), na.rm=TRUE)
                   
-                  m <- compute_all_metrics(as.numeric(splits$test[[target]]), ens_p, model_name="ensemble")
-                  res_matrix[j, i] <- m$RMSE # اصلاح: استفاده از j به جای نام مدل
+                  m <- compute_all_metrics(as.numeric(test_df_reg[[target]]), ens_p, model_name="ensemble")
+                  res_matrix[j, i] <- m$RMSE 
                 }
               }
               next
             }
             
-            # اجرای مدل‌های پایه
             fc <- tryCatch(
-              run_model_by_name(mn, splits$train, test_h_reg, target),
+              run_hourly_model(mn, train_df_reg, test_h_reg, target),
               error = function(e) NULL
             )
             if(!is.null(fc) && !is.null(fc$predictions) && length(fc$predictions) > 0) {
               preds <- fc$predictions[seq_len(min(test_h_reg, length(fc$predictions)))]
-              actual <- splits$test[[target]][seq_len(length(preds))]
+              actual <- test_df_reg[[target]][seq_len(length(preds))]
               m <- compute_all_metrics(actual, preds, model_name=mn)
-              res_matrix[j, i] <- m$RMSE # اصلاح: استفاده از j به جای نام مدل
+              res_matrix[j, i] <- m$RMSE
               
-              # ذخیره برای انسمبل
               preds_padded <- rep(NA_real_, test_h_reg)
               preds_padded[seq_along(preds)] <- as.numeric(preds)
               station_preds[[mn]] <- preds_padded
@@ -612,7 +418,7 @@ leaderboardServer <- function(id, weather_data) {
           setProgress(i/length(stations))
         }
         regional_data(res_matrix)
-        showNotification("Heatmap منطقه‌ای ساخته شد ✓", type="message")
+        showNotification("Heatmap منطقه‌ای ساعتی ساخته شد ✓", type="message")
       })
     })
     
@@ -620,68 +426,34 @@ leaderboardServer <- function(id, weather_data) {
       req(regional_data())
       m <- regional_data()
       plotly::plot_ly(
-        x = colnames(m), y = rownames(m),
-        z = m, type = "heatmap",
+        x = colnames(m), y = rownames(m), z = m, type = "heatmap",
         colorscale = "RdYlGn", reversescale = TRUE,
         hovertemplate = "Model: %{y}<br>Station: %{x}<br>RMSE: %{z:.2f}<extra></extra>"
       ) %>%
-        plotly::layout(
-          paper_bgcolor = "transparent", plot_bgcolor = "transparent",
-          font = list(family="Vazirmatn", color="#94a3b8", size=15),
-          margin = list(l=110, r=20, t=10, b=60)
-        ) %>%
+        plotly::layout(paper_bgcolor = "transparent", plot_bgcolor = "transparent", font = list(family="Vazirmatn", color="#94a3b8", size=15), margin = list(l=110, r=20, t=10, b=60)) %>%
         plotly::config(displayModeBar = FALSE)
     })
     
     output$bench_time_val <- renderUI({
-      if (is.null(benchmark_data())) {
-        tags$span(style="color:var(--text3);font-size:18px;", "—")
-      } else {
-        tags$span(style="color:var(--blue2);font-size:22px;font-weight:800;",
-                  paste0(benchmark_data()$info$exec_time, " ثانیه"))
-      }
+      if (is.null(benchmark_data())) { tags$span(style="color:var(--text3);font-size:18px;", "—") 
+      } else { tags$span(style="color:var(--blue2);font-size:22px;font-weight:800;", paste0(benchmark_data()$info$exec_time, " ثانیه")) }
     })
     
-    # ── ساختار جدید کارت‌های آمار با آیکون ────────────────────────────────────
     output$lb_stats_ui <- renderUI({
       if (is.null(benchmark_data())) {
         tags$div(class="lb-hero-stats",
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-layer-group")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "مدل ارزیابی شد"))
-                 ),
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-map-pin")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "ایستگاه"))
-                 ),
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-bullseye")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "متغیر هدف"))
-                 ),
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-stopwatch")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "زمان کل"))
-                 )
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-layer-group")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "مدل"))),
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-map-pin")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "ایستگاه"))),
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-bullseye")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "متغیر"))),
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-stopwatch")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", "—"), tags$div(class="lb-hero-stat-lbl", "زمان")))
         )
       } else {
         info <- benchmark_data()$info
         tags$div(class="lb-hero-stats",
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-layer-group")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", info$n_models), tags$div(class="lb-hero-stat-lbl", "مدل ارزیابی شد"))
-                 ),
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-map-pin")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", info$station), tags$div(class="lb-hero-stat-lbl", "ایستگاه"))
-                 ),
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-bullseye")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", info$target), tags$div(class="lb-hero-stat-lbl", "متغیر هدف"))
-                 ),
-                 tags$div(class="lb-hero-stat-item",
-                          tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-stopwatch")),
-                          tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", paste0(info$exec_time, "s")), tags$div(class="lb-hero-stat-lbl", "زمان کل"))
-                 )
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-layer-group")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", info$n_models), tags$div(class="lb-hero-stat-lbl", "مدل"))),
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-map-pin")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", info$station), tags$div(class="lb-hero-stat-lbl", "ایستگاه"))),
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-bullseye")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", info$target), tags$div(class="lb-hero-stat-lbl", "متغیر"))),
+                 tags$div(class="lb-hero-stat-item", tags$div(class="lb-hero-stat-icon", tags$i(class="fa fa-stopwatch")), tags$div(class="lb-hero-stat-text", tags$div(class="lb-hero-stat-val", paste0(info$exec_time, "s")), tags$div(class="lb-hero-stat-lbl", "زمان")))
         )
       }
     })
@@ -697,15 +469,8 @@ leaderboardServer <- function(id, weather_data) {
         dplyr::select("رتبه"=rank_label, "مدل"=model_label, "RMSE"=RMSE, "MAE"=MAE, "R²"=R2, "نمره ترکیبی"=composite_score) %>%
         dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
       
-      DT::datatable(display,
-                    options = list(pageLength = 12, dom = "t", scrollX = TRUE,
-                                   order = list(list(5, "asc")),
-                                   columnDefs = list(list(className = "dt-center", targets = "_all"))),
-                    rownames = FALSE, class = "cell-border stripe hover") %>%
-        DT::formatStyle("نمره ترکیبی",
-                        background = DT::styleColorBar(c(0, 1), "#3b82f6"),
-                        backgroundSize = "100% 70%", backgroundRepeat = "no-repeat",
-                        backgroundPosition = "center")
+      DT::datatable(display, options = list(pageLength = 12, dom = "t", scrollX = TRUE, order = list(list(5, "asc")), columnDefs = list(list(className = "dt-center", targets = "_all"))), rownames = FALSE, class = "cell-border stripe hover") %>%
+        DT::formatStyle("نمره ترکیبی", background = DT::styleColorBar(c(0, 1), "#3b82f6"), backgroundSize = "100% 70%", backgroundRepeat = "no-repeat", backgroundPosition = "center")
     })
     
     output$metric_bar_chart <- plotly::renderPlotly({
@@ -714,20 +479,10 @@ leaderboardServer <- function(id, weather_data) {
       metric <- input$metric_to_plot
       ascending <- metric != "R2"
       res_sorted <- if (ascending) dplyr::arrange(res, dplyr::desc(.data[[metric]])) else dplyr::arrange(res, .data[[metric]])
-      res_sorted <- dplyr::mutate(res_sorted,
-                                  model_label = MODEL_LABELS[model] %||% model,
-                                  bar_color = MODEL_COLORS[model] %||% "#64748b",
-                                  val = round(as.numeric(.data[[metric]]), 3))
+      res_sorted <- dplyr::mutate(res_sorted, model_label = MODEL_LABELS[model] %||% model, bar_color = MODEL_COLORS[model] %||% "#64748b", val = round(as.numeric(.data[[metric]]), 3))
       
-      plotly::plot_ly(res_sorted, x = ~model_label, y = ~val, type = "bar",
-                      marker = list(color = ~bar_color, opacity = 0.85),
-                      hovertemplate = paste0("<b>%{x}</b><br>", metric, ": %{y}<extra></extra>")) %>%
-        plotly::layout(
-          paper_bgcolor = "transparent", plot_bgcolor  = "transparent",
-          font = list(family="Vazirmatn,Tahoma", color="#94a3b8", size=15),
-          xaxis = list(title="", gridcolor="transparent", tickfont=list(size=14, color="#94a3b8")),
-          yaxis = list(title=metric, gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=14, color="#94a3b8")),
-          margin = list(l=60, r=20, t=10, b=60), showlegend = FALSE) %>%
+      plotly::plot_ly(res_sorted, x = ~model_label, y = ~val, type = "bar", marker = list(color = ~bar_color, opacity = 0.85), hovertemplate = paste0("<b>%{x}</b><br>", metric, ": %{y}<extra></extra>")) %>%
+        plotly::layout(paper_bgcolor = "transparent", plot_bgcolor  = "transparent", font = list(family="Vazirmatn,Tahoma", color="#94a3b8", size=15), xaxis = list(title="", gridcolor="transparent", tickfont=list(size=14, color="#94a3b8")), yaxis = list(title=metric, gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=14, color="#94a3b8")), margin = list(l=60, r=20, t=10, b=60), showlegend = FALSE) %>%
         plotly::config(displayModeBar=FALSE)
     })
     
@@ -737,21 +492,10 @@ leaderboardServer <- function(id, weather_data) {
       speed_df <- benchmark_data()$speed
       merged <- dplyr::inner_join(metrics_df, speed_df, by = c("model" = "model_id"))
       merged$model_label <- sapply(merged$model, function(m) MODEL_LABELS[[m]])
-      # دسته‌بندی برای رنگ‌بندی در نمودار
       merged$type <- ifelse(merged$model == "ensemble", "Ensemble", ifelse(merged$model %in% ML_MODELS, "ML", "Statistical"))
       
-      plotly::plot_ly(merged, x = ~exec_time, y = ~RMSE, type = "scatter", mode = "markers",
-                      color = ~type, colors = c("Ensemble" = "#22c55e", "ML" = "#f59e0b", "Statistical" = "#3b82f6"),
-                      marker = list(size = 18, opacity = 0.8,
-                                    line = list(width = 1, color = "rgba(255,255,255,0.5)")),
-                      text = ~model_label,
-                      hovertemplate = "<b>%{text}</b><br>Time: %{x}s<br>RMSE: %{y}<extra></extra>") %>%
-        plotly::layout(
-          paper_bgcolor = "transparent", plot_bgcolor = "transparent",
-          font = list(family="Vazirmatn", color="#94a3b8", size=15),
-          xaxis = list(title = "زمان اجرا (ثانیه)", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#94a3b8")),
-          yaxis = list(title = "RMSE", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#94a3b8")),
-          legend = list(orientation = "h", y = -0.2, font=list(size=14))) %>%
+      plotly::plot_ly(merged, x = ~exec_time, y = ~RMSE, type = "scatter", mode = "markers", color = ~type, colors = c("Ensemble" = "#22c55e", "ML" = "#f59e0b", "Statistical" = "#3b82f6"), marker = list(size = 18, opacity = 0.8, line = list(width = 1, color = "rgba(255,255,255,0.5)")), text = ~model_label, hovertemplate = "<b>%{text}</b><br>Time: %{x}s<br>RMSE: %{y}<extra></extra>") %>%
+        plotly::layout(paper_bgcolor = "transparent", plot_bgcolor = "transparent", font = list(family="Vazirmatn", color="#94a3b8", size=15), xaxis = list(title = "زمان اجرا (ثانیه)", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#94a3b8")), yaxis = list(title = "RMSE", gridcolor = "rgba(99,143,232,0.1)", tickfont=list(size=14, color="#94a3b8")), legend = list(orientation = "h", y = -0.2, font=list(size=14))) %>%
         plotly::config(displayModeBar = FALSE)
     })
     
@@ -762,8 +506,7 @@ leaderboardServer <- function(id, weather_data) {
       best_name <- MODEL_LABELS[[best$model_id]]
       
       tags$div(
-        tags$div(style="text-align:center; margin-bottom:12px; font-size:18px; color:#22c55e; font-weight:800;",
-                 paste0("پایدارترین مدل: ", best_name)),
+        tags$div(style="text-align:center; margin-bottom:12px; font-size:18px; color:#22c55e; font-weight:800;", paste0("پایدارترین مدل: ", best_name)),
         tags$div(class="stability-grid",
                  tags$div(class="stab-card", tags$div(class="stab-val", round(best$mean_rank, 1)), tags$div(class="stab-lbl", "Mean Rank")),
                  tags$div(class="stab-card", tags$div(class="stab-val", round(best$rank_sd, 2)), tags$div(class="stab-lbl", "Rank SD")),
@@ -779,15 +522,8 @@ leaderboardServer <- function(id, weather_data) {
       stab$model_label <- sapply(stab$model_id, function(m) MODEL_LABELS[[m]])
       stab <- stab[order(stab$stability_score, decreasing=TRUE),]
       
-      plotly::plot_ly(stab, x = ~model_label, y = ~stability_score, type = "bar",
-                      marker = list(color = "#22c55e", opacity = 0.8),
-                      hovertemplate = "<b>%{x}</b><br>Score: %{y}<extra></extra>") %>%
-        plotly::layout(
-          paper_bgcolor = "transparent", plot_bgcolor  = "transparent",
-          font = list(family="Vazirmatn", color="#94a3b8", size=14),
-          xaxis = list(title="", gridcolor="transparent", tickfont=list(size=13, color="#94a3b8")),
-          yaxis = list(title="Score", gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=13, color="#94a3b8")),
-          margin = list(l=50, r=20, t=10, b=50)) %>%
+      plotly::plot_ly(stab, x = ~model_label, y = ~stability_score, type = "bar", marker = list(color = "#22c55e", opacity = 0.8), hovertemplate = "<b>%{x}</b><br>Score: %{y}<extra></extra>") %>%
+        plotly::layout(paper_bgcolor = "transparent", plot_bgcolor  = "transparent", font = list(family="Vazirmatn", color="#94a3b8", size=14), xaxis = list(title="", gridcolor="transparent", tickfont=list(size=13, color="#94a3b8")), yaxis = list(title="Score", gridcolor="rgba(99,143,232,0.06)", tickfont=list(size=13, color="#94a3b8")), margin = list(l=50, r=20, t=10, b=50)) %>%
         plotly::config(displayModeBar = FALSE)
     })
     
@@ -803,15 +539,8 @@ leaderboardServer <- function(id, weather_data) {
         color <- MODEL_COLORS[[row$model_id]]
         
         tags$div(class="speed-row",
-                 tags$div(class="speed-label",
-                          tags$span(row$model_label),
-                          tags$span(paste0(row$exec_time, "s"))
-                 ),
-                 tags$div(class="speed-track",
-                          tags$div(class="speed-fill",
-                                   style=paste0("width:", width_pct, "%; background:", color, ";")
-                          )
-                 )
+                 tags$div(class="speed-label", tags$span(row$model_label), tags$span(paste0(row$exec_time, "s"))),
+                 tags$div(class="speed-track", tags$div(class="speed-fill", style=paste0("width:", width_pct, "%; background:", color, ";")))
         )
       })
       do.call(tagList, bars)
@@ -831,38 +560,18 @@ leaderboardServer <- function(id, weather_data) {
       
       tags$div(
         class = "reco-card",
-        tags$div(class = "reco-header",
-                 tags$i(class="fa fa-wand-magic-sparkles"), "مدل پیشنهادی سیستم"
-        ),
-        tags$div(class = "reco-model", 
-                 tags$i(class="fa fa-trophy", style="color:#fbbf24;"), 
-                 best_acc_name
-        ),
-        tags$div(class = "reco-score", 
-                 tags$i(class="fa fa-star"), 
-                 tags$span(paste0("امتیاز کلی: ", score, " از 10"))
-        ),
+        tags$div(class = "reco-header", tags$i(class="fa fa-wand-magic-sparkles"), "مدل پیشنهادی سیستم"),
+        tags$div(class = "reco-model", tags$i(class="fa fa-trophy", style="color:#fbbf24;"), best_acc_name),
+        tags$div(class = "reco-score", tags$i(class="fa fa-star"), tags$span(paste0("امتیاز کلی: ", score, " از 10"))),
         tags$div(class = "reco-why",
-                 tags$div(tags$i(class="fa fa-bullseye"),
-                          tags$span(paste0("کمترین میزان خطا (RMSE: ", round(best_acc$RMSE, 2), ")"))
-                 ),
-                 tags$div(tags$i(class="fa fa-chart-line"),
-                          tags$span(paste0("بالاترین ضریب تعیین (R²: ", round(best_acc$R2, 3), ")"))
-                 ),
-                 tags$div(tags$i(class="fa fa-medal"),
-                          tags$span("برترین نمره ترکیبی در میان مدل‌ها")
-                 )
+                 tags$div(tags$i(class="fa fa-bullseye"), tags$span(paste0("کمترین میزان خطا (RMSE: ", round(best_acc$RMSE, 2), ")"))),
+                 tags$div(tags$i(class="fa fa-chart-line"), tags$span(paste0("بالاترین ضریب تعیین (R²: ", round(best_acc$R2, 3), ")"))),
+                 tags$div(tags$i(class="fa fa-medal"), tags$span("برترین نمره ترکیبی در میان مدل‌ها"))
         ),
         tags$div(class = "reco-alt",
                  tags$strong(style="color:var(--text); display:block; margin-bottom:8px; font-size:16px;", "مدل‌های جایگزین:"),
-                 tags$div(class="reco-alt-item",
-                          tags$i(class="fa fa-bolt", style="color:#f59e0b;"),
-                          tags$span(paste0("اولویت با سرعت: ", best_speed_name, " (", round(best_speed$exec_time, 3), "s)"))
-                 ),
-                 tags$div(class="reco-alt-item",
-                          tags$i(class="fa fa-microscope", style="color:#3b82f6;"),
-                          tags$span(paste0("اولویت با دقت: ", best_acc_name))
-                 )
+                 tags$div(class="reco-alt-item", tags$i(class="fa fa-bolt", style="color:#f59e0b;"), tags$span(paste0("اولویت با سرعت: ", best_speed_name, " (", round(best_speed$exec_time, 3), "s)"))),
+                 tags$div(class="reco-alt-item", tags$i(class="fa fa-microscope", style="color:#3b82f6;"), tags$span(paste0("اولویت با دقت: ", best_acc_name)))
         )
       )
     })

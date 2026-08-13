@@ -114,7 +114,6 @@ body, .content-wrapper, .main-footer {
   position: relative;
   min-height: 50px;
 }
-/* دکمه همبرگر */
 .main-header .navbar .sidebar-toggle {
   position: absolute !important;
   top: 0 !important;
@@ -127,10 +126,7 @@ body, .content-wrapper, .main-footer {
   align-items: center;
   padding: 0 15px !important;
 }
-.main-header .navbar .sidebar-toggle:hover {
-  background: var(--hover-bg) !important;
-}
-/* بقیه‌ی آیتم‌های navbar */
+.main-header .navbar .sidebar-toggle:hover { background: var(--hover-bg) !important; }
 .main-header .navbar-custom-menu,
 .main-header .navbar-nav,
 .main-header .navbar > .container-fluid {
@@ -139,16 +135,12 @@ body, .content-wrapper, .main-footer {
   display: flex;
   align-items: center;
 }
-
-/* اصلاح فونت و جایگاه المان‌های داخل نوار بالا ( Navbar ) */
 .main-header .navbar-custom-menu .dropdown {
   height: 50px !important;
   display: flex !important;
   align-items: center !important;
   font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
-
-/* دکمه تم در navbar */
 .theme-toggle-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 14px; border-radius: 20px; cursor: pointer;
@@ -172,13 +164,11 @@ body, .content-wrapper, .main-footer {
   transition: right 0.3s ease-in-out !important;
 }
 .wrapper { direction: rtl !important; }
-
 .content-wrapper, .main-footer {
   margin-right: 230px !important;
   margin-left: 0 !important;
   transition: margin-right 0.3s ease-in-out;
 }
-
 .sidebar-collapse .main-sidebar {
   right: -230px !important;
   left: auto !important;
@@ -195,20 +185,17 @@ body, .content-wrapper, .main-footer {
   transform: none !important;
   -webkit-transform: none !important;
 }
-
 .sidebar-collapse .main-sidebar[style] {
   right: -230px !important;
   left: auto !important;
   transform: none !important;
 }
-
 @media (max-width: 767px) {
   .content-wrapper, .main-footer { margin-right: 0 !important; }
   .main-sidebar { right: -230px; transition: right 0.3s; }
   .sidebar-open .main-sidebar { right: 0; }
 }
 body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !important; }
-
 
 .sidebar-menu > li > a {
   color: var(--text2) !important;
@@ -217,9 +204,7 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
   margin: 2px 8px; padding: 10px 13px !important;
   transition: all 0.18s; display: flex; align-items: center; gap: 8px;
 }
-.sidebar-menu > li > a:hover {
-  background: var(--hover-bg) !important; color: var(--text) !important;
-}
+.sidebar-menu > li > a:hover { background: var(--hover-bg) !important; color: var(--text) !important; }
 .sidebar-menu > li.active > a,
 .sidebar-menu > li.active > a:hover {
   background: var(--active-bg) !important;
@@ -293,7 +278,6 @@ body.light-mode .main-sidebar { box-shadow: -2px 0 10px rgba(0,0,0,0.06) !import
 .control-label { color: var(--text3) !important; font-size: 12px !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.7px; }
 select option  { background: var(--panel2) !important; color: var(--text) !important; }
 
-/* Slider */
 .irs-bar,.irs-bar-edge { background: var(--blue) !important; border-color: var(--blue) !important; }
 .irs-single,.irs-from,.irs-to { background: var(--blue) !important; font-family:'Vazirmatn',Tahoma,sans-serif !important; }
 .irs-line   { background: var(--border2) !important; border: none !important; }
@@ -320,8 +304,13 @@ select option  { background: var(--panel2) !important; color: var(--text) !impor
 }
 .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(239,68,68,0.32) !important; }
 .btn-danger:focus, .btn-success:focus { outline: none !important; }
+.btn-default {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--border) !important; color: var(--text2) !important;
+}
+.btn-default:hover { background: var(--hover-bg) !important; color: var(--text) !important; }
 
-/* ══ کارت‌های دانلود گزارش (تب گزارش) ══ */
+/* ══ کارت‌های دانلود گزارش ══ */
 .report-dl-card {
   background: var(--panel2); border: 1px dashed var(--border2); border-radius: var(--radius);
   padding: 28px 20px; text-align: center; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
@@ -334,7 +323,6 @@ body.light-mode .report-dl-card:hover { box-shadow: 0 8px 20px rgba(30,41,59,0.1
 .report-dl-card .dl-desc { font-size: 13px; color: var(--text3); line-height: 1.6; margin: 0; }
 .report-dl-card .shiny-download-link { margin-top: 4px; }
 
-/* ══ بخش «محتوای گزارش» (تب گزارش) ══ */
 .rc-sec-title { font-size: 13px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .6px; margin: 2px 0 9px; display: flex; align-items: center; }
 .rc-chip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .rc-chip-grid .shiny-input-checkbox:not(.shiny-input-container) { display: flex; }
@@ -361,11 +349,6 @@ body.light-mode .report-dl-card:hover { box-shadow: 0 8px 20px rgba(30,41,59,0.1
   content: '\2713'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   color: #fff; font-size: 11px; font-weight: 900; line-height: 1;
 }
-.btn-default {
-  background: var(--input-bg) !important;
-  border: 1px solid var(--border) !important; color: var(--text2) !important;
-}
-.btn-default:hover { background: var(--hover-bg) !important; color: var(--text) !important; }
 
 /* ══ DATATABLES ══ */
 .dataTables_wrapper { color: var(--text) !important; }
@@ -436,7 +419,7 @@ hr { border-color: var(--border) !important; margin: 12px 0; }
 .hchip-purple { background:rgba(139,92,246,0.12);  color:#a78bfa; border:1px solid rgba(139,92,246,0.2); }
 .hchip-green  { background:rgba(34,197,94,0.12);   color:#4ade80; border:1px solid rgba(34,197,94,0.2); }
 
-/* ══ MODEL CARDS v2 (راهنما) ══════════════════════════════════════════════ */
+/* ══ MODEL CARDS v2 ══ */
 .model-card-sci {
   background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
   padding: 15px 17px 14px; margin-bottom: 12px;
@@ -651,6 +634,11 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(fixSidebarToggle, 100);
   setTimeout(renderMathFormulas, 100);
 });
+
+// رندر مجدد فرمول‌ها هنگام کلیک روی منوها (برای تب‌های پنهان)
+ $(document).on('click', '.sidebar-menu a', function() {
+  setTimeout(renderMathFormulas, 200);
+});
 "
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -737,7 +725,6 @@ ui <- shinydashboard::dashboardPage(
   title = "سامانه پیش بینی آب و هوا",
   skin = "black",
   
-  # ── هدر با دکمه تم در سمت چپ navbar ──────────────────────────────────────
   shinydashboard::dashboardHeader(
     title = tags$span(
       style = "font-family:'Vazirmatn',Tahoma,sans-serif;font-weight:800;font-size:15px;color:var(--text);display:flex;align-items:center;height:50px;",
@@ -746,7 +733,6 @@ ui <- shinydashboard::dashboardPage(
     ),
     titleWidth = 240,
     
-    # دکمه تم در سمت چپ نوار (اصلاح ارتفاع و فونت)
     tags$li(
       class = "dropdown",
       style = "display:flex;align-items:center;height:50px;padding:0 15px;",
@@ -758,7 +744,6 @@ ui <- shinydashboard::dashboardPage(
       )
     ),
     
-    # متادیتا (اصلاح ارتفاع، فاصله و فونت)
     tags$li(
       class = "dropdown",
       style = "display:flex;align-items:center;height:50px;padding:0 20px;gap:20px;font-size:13px;color:var(--text3);font-weight:600;",
@@ -773,7 +758,6 @@ ui <- shinydashboard::dashboardPage(
     )
   ),
   
-  # ── سایدبار ────────────────────────────────────────────────────────────────
   shinydashboard::dashboardSidebar(
     width = 228,
     
@@ -791,7 +775,6 @@ ui <- shinydashboard::dashboardPage(
                   crossorigin="anonymous")
     ),
     
-    # لوگو
     tags$div(
       style="padding:16px 14px 13px;border-bottom:1px solid var(--border);",
       tags$div(style="display:flex;align-items:center;gap:9px;",
@@ -819,7 +802,6 @@ ui <- shinydashboard::dashboardPage(
       shinydashboard::menuItem("خروجی گزارش",       tabName="report",      icon=icon("file-export"))
     ),
     
-    # فوتر
     tags$div(class="sidebar-status",
              tags$div(style="margin-bottom:3px;",
                       tags$span(class="status-dot"),
@@ -831,7 +813,6 @@ ui <- shinydashboard::dashboardPage(
     )
   ),
   
-  # ── بدنه ───────────────────────────────────────────────────────────────────
   shinydashboard::dashboardBody(
     shinydashboard::tabItems(
       
@@ -841,7 +822,7 @@ ui <- shinydashboard::dashboardPage(
       shinydashboard::tabItem(tabName="anomaly",     anomalyUI("anomaly")),
       shinydashboard::tabItem(tabName="report",      reportUI("report")),
       
-      # راهنمای مدل‌ها
+      # ── راهنمای مدل‌ها ── (اصلاح کاما جا افتاده)
       shinydashboard::tabItem(tabName="model_guide",
                               
                               fluidRow(column(12,
@@ -1060,26 +1041,17 @@ ui <- shinydashboard::dashboardPage(
 server <- function(input, output, session) {
   
   weather_data <- reactive({ WEATHER_DATA })
+  hourly_data  <- reactive({ WEATHER_DATA_HOURLY })
   
-  homeServer("home", weather_data, hourly_data = reactive({ WEATHER_DATA_HOURLY }))
-  forecast_rv <- forecastServer("forecast",     weather_data,
-                                hourly_data = reactive({ WEATHER_DATA_HOURLY }))
-  leaderboard_rv <- leaderboardServer("leaderboard", weather_data)
-  anomaly_rv <- anomalyServer("anomaly",       weather_data)
-  reportServer("report",         weather_data,
+  homeServer("home", weather_data, hourly_data = hourly_data)
+  forecast_rv <- forecastServer("forecast", weather_data, hourly_data = hourly_data)
+  leaderboard_rv <- leaderboardServer("leaderboard", hourly_data)
+  anomaly_rv <- anomalyServer("anomaly", hourly_data)
+  reportServer("report", weather_data,
                forecast_rv     = forecast_rv,
                anomaly_rv      = anomaly_rv,
                leaderboard_rv  = leaderboard_rv)
 }
 
-app_obj <- shinyApp(ui, server)
-
-if (identical(environment(), globalenv()) &&
-    !exists("shiny_test_mode", envir = globalenv())) {
-  options(shiny.launch.browser = TRUE)  # مرورگر خارجی
-  options(shiny.host = "127.0.0.1")
-  options(shiny.port = 3838)  # پورت ثابت
-  runApp(app_obj)
-} else {
-  app_obj
-}
+# اجرای اپلیکیشن به‌صورت استاندارد
+shinyApp(ui, server)
