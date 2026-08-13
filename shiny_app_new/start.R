@@ -8,11 +8,9 @@ cat("║  راه‌انداز اپ شاین با UTF-8 + مرورگر خارجی
 cat("╚════════════════════════════════════════════════════════════════╝\n\n")
 
 # ── مرحله ۰: پیدا کردن خودکار مسیر پروژه ────────────────────────────────────
-# این بخش از خطای App dir must contain app.R جلوگیری می‌کند
-cat("[۰/۵] تنظیم مسیر پروژه...\n")
+cat("[۰/۴] تنظیم مسیر پروژه...\n")
 tryCatch({
   if (interactive() && "rstudioapi" %in% rownames(installed.packages())) {
-    # اگر در RStudio اجرا می‌شود، مسیر فایل فعال را می‌گیرد
     doc_path <- rstudioapi::getSourceEditorContext()$path
     if (length(doc_path) > 0 && grepl("start.R$", doc_path)) {
       setwd(dirname(doc_path))
@@ -37,34 +35,13 @@ if (!file.exists("app.R")) {
   stop("App dir must contain either app.R or server.R.")
 }
 
-# ── مرحله ۱: تنظیم locale UTF-8 ─────────────────────────────────────────────
-cat("[۱/۵] تنظیم locale UTF-8...\n")
-if (.Platform$OS.type == "windows") {
-  locs <- c("Persian_Iran.65001", "English_United States.65001",
-            "English_United States.1252", "C")
-} else {
-  locs <- c("en_US.UTF-8", "C.UTF-8", "fa_IR.UTF-8", "C")
-}
-locale_ok <- FALSE
-for (loc in locs) {
-  ok <- tryCatch({
-    suppressWarnings(Sys.setlocale("LC_ALL", loc))
-    cur <- Sys.getlocale("LC_CTYPE")
-    grepl("65001|UTF-8|utf8|utf-8", cur, ignore.case = TRUE)
-  }, error = function(e) FALSE)
-  if (isTRUE(ok)) {
-    cat("  ✓ Locale ست شد:", loc, "\n")
-    locale_ok <- TRUE
-    break
-  }
-}
-if (!locale_ok) {
-  cat("  ⚠ نتوانستیم locale UTF-8 را تنظیم کنیم — ادامه می‌دهیم...\n")
-}
+# ── مرحله ۱: فعال‌سازی encoding پیش‌فرض ────────────────────────────────────────
+cat("[۱/۴] تنظیم Encoding UTF-8...\n")
 options(encoding = "UTF-8")
+cat("  ✓ Encoding پیش‌فرض روی UTF-8 تنظیم شد\n")
 
-# ── مرحله ۲: فعال‌سازی پچ خودکار UTF-8 ────────────────────────────────────────
-cat("[۲/۵] فعال‌سازی پچ خودکار UTF-8...\n")
+# ── مرحله ۲: فعال‌سازی پچ خودکار UTF-8 (در صورت وجود) ──────────────────────────
+cat("[۲/۴] بررسی پچ UTF-8...\n")
 if (file.exists("utf8_patch.R")) {
   tryCatch({
     source("utf8_patch.R", encoding = "UTF-8", local = FALSE)
@@ -76,25 +53,26 @@ if (file.exists("utf8_patch.R")) {
   cat("  ⚠ فایل utf8_patch.R پیدا نشد — ادامه بدون پچ\n")
 }
 
-# ── مرحله ۲.۵: هشدار در مورد فایل debug_sub.R ────────────────────────────────
+# هشدار فایل‌های مزاحم
 if (file.exists("debug_sub.R")) {
   cat("  ⚠ فایل debug_sub.R پیدا شد — لطفاً آن را از پوشه پاک کنید!\n")
 }
 
-# ── مرحله ۳: تنظیمات مرورگر خارجی ────────────────────────────────────────────
-cat("[۳/۵] تنظیم مرورگر خارجی برای اپ...\n")
-options(shiny.launch.browser = TRUE)
-options(shiny.host = "127.0.0.1")
-options(shiny.port = 3838)
-cat("  ✓ اپ در مرورگر پیش‌فرض سیستم باز می‌شود\n")
-cat("  ✓ آدرس: http://127.0.0.1:3838\n")
-
-# ── مرحله ۴: اجرای اپ ───────────────────────────────────────────────────────
-cat("[۴/۵] در حال اجرای اپ...\n")
+# ── مرحله ۳: تنظیمات اجرای مرورگر ─────────────────────────────────────────────
+cat("[۳/۴] آماده‌سازی برای اجرای اپ...\n")
 cat("═══════════════════════════════════════════════════\n")
-cat("  اپ در حال اجراست — منتظر باز شدن مرورگر بمانید\n")
+cat("  اپ در مرورگر پیش‌فرض سیستم باز خواهد شد\n")
 cat("  برای توقف: Ctrl+C در کنسول R را بزنید\n")
 cat("═══════════════════════════════════════════════════\n\n")
 
+# ── مرحله ۴: اجرای اپ ───────────────────────────────────────────────────────
+cat("[۴/۴] در حال اجرای اپ...\n")
+
 # اجرای مستقیم app.R
-shiny::runApp(".", port = 3838, launch.browser = TRUE, host = "127.0.0.1")
+# host="127.0.0.1" و launch.browser=TRUE باعث باز شدن اپ در مرورگر می‌شود.
+shiny::runApp(
+  appDir = ".",
+  port = 3838,
+  host = "127.0.0.1",
+  launch.browser = TRUE
+)

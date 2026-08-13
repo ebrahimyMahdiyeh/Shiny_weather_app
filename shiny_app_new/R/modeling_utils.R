@@ -1,11 +1,33 @@
 # File: R/modeling_utils.R
 # پیاده‌سازی تمام مدل‌های پیش‌بینی سری زمانی
-# نسخه نهایی پایدار: رفع تداخل توابع + پایداری کامل ETS و Prophet
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ════════════════════════════════════════════════════════════════════════════
 # بخش ۱: مدل‌های کلاسیک سری زمانی (روزانه)
 # ════════════════════════════════════════════════════════════════════════════
+# ── ساخت ماتریس ویژگی برای مدل‌های ML (ساعتی - محلی و ایمن) ──────────────────
+build_hourly_feature_matrix <- function(df, target = "temperature", lag_hours = c(1, 2, 3, 24)) {
+  df <- df %>%
+    dplyr::arrange(timestamp) %>%
+    dplyr::mutate(
+      hour = lubridate::hour(timestamp), hour_sin = sin(2 * pi * hour / 24), hour_cos = cos(2 * pi * hour / 24),
+      day_of_week = lubridate::wday(timestamp), day_of_year = lubridate::yday(timestamp), month = lubridate::month(timestamp),
+      sin_annual = sin(2 * pi * day_of_year / 365), cos_annual = cos(2 * pi * day_of_year / 365),
+      sin_weekly = sin(2 * pi * day_of_week / 7), cos_weekly = cos(2 * pi * day_of_week / 7)
+    )
+  for (lg in lag_hours) {
+    df[[paste0("lag_", lg, "h")]] <- dplyr::lag(df[[target]], lg)
+  }
+  df$rolling_6h <- zoo::rollmean(df[[target]], k = 6, fill = NA, align = "right")
+  df$rolling_24h <- zoo::rollmean(df[[target]], k = 24, fill = NA, align = "right")
+  df %>% tidyr::drop_na()
+}
+
+HOURLY_FEAT_COLS <- c(
+  "hour", "hour_sin", "hour_cos", "day_of_week", "month", "sin_annual", "cos_annual", "sin_weekly", "cos_weekly",
+  "lag_1h", "lag_2h", "lag_3h", "lag_24h", "rolling_6h", "rolling_24h",
+  "temperature", "humidity", "wind_speed", "precipitation"
+)
 
 forecast_arima <- function(train_df, horizon, target = "temperature") {
   n <- min(nrow(train_df), 1095)
@@ -19,78 +41,64 @@ forecast_arima <- function(train_df, horizon, target = "temperature") {
   )
   xreg_future <- forecast::fourier(ts_data, K = K, h = horizon)
   fc <- forecast::forecast(fit, xreg = xreg_future)
-  list(model = fit, predictions = as.numeric(fc$mean), lower = as.numeric(fc$lower[, 2]), upper = as.numeric(fc$upper[, 2]), method = "ARIMA (Fourier)")
+  list(model = fit, predictions = as.numeric(fc$mean), lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), method = "ARIMA (Fourier)")
 }
 
 forecast_sarima <- function(train_df, horizon, target = "temperature") {
   n <- min(nrow(train_df), 1095)
   recent_df <- tail(train_df, n)
+  
+  # سری زمانی با فرکانس هفتگی برای捕捉 الگوهای SARIMA
   ts_data <- ts(recent_df[[target]], frequency = 7)
-  ts_data_365 <- ts(recent_df[[target]], frequency = 365)
-  K <- 5
-  xreg <- forecast::fourier(ts_data_365, K = K)
+  
+  # ساخت ماتریس فوریه برای فصلی بودن سالانه (جلوگیری از تداخل ts)
+  K <- 3
+  t_train <- seq_len(n)
+  t_future <- n + seq_len(horizon)
+  
+  xreg <- matrix(NA, nrow = n, ncol = 2 * K)
+  xreg_future <- matrix(NA, nrow = horizon, ncol = 2 * K)
+  
+  for (k in 1:K) {
+    xreg[, 2*k - 1] <- sin(2 * pi * k * t_train / 365.25)
+    xreg[, 2*k]     <- cos(2 * pi * k * t_train / 365.25)
+    xreg_future[, 2*k - 1] <- sin(2 * pi * k * t_future / 365.25)
+    xreg_future[, 2*k]     <- cos(2 * pi * k * t_future / 365.25)
+  }
+  
+  # استفاده از auto.arima برای پیدا کردن خودکار d (تفاضل‌گیری روند) و D (تفاضل‌گیری فصلی)
   fit <- tryCatch(
-    forecast::Arima(ts_data, order = c(1, 0, 1), seasonal = list(order = c(1, 0, 1), period = 7), xreg = xreg),
-    error = function(e) forecast::auto.arima(ts_data, xreg = xreg, seasonal = TRUE, stepwise = TRUE, approximation = TRUE)
+    forecast::auto.arima(
+      ts_data, 
+      xreg = xreg, 
+      seasonal = TRUE, 
+      stepwise = TRUE, 
+      approximation = FALSE, 
+      D = 1  # تفاضل‌گیری فصلی هفتگی فعال شود تا خط صاف نشود
+    ),
+    error = function(e) forecast::Arima(ts_data, order = c(1,1,1), seasonal = list(order = c(1,0,1), period = 7), xreg = xreg)
   )
-  xreg_future <- forecast::fourier(ts_data_365, K = K, h = horizon)
+  
   fc <- forecast::forecast(fit, xreg = xreg_future)
-  list(model = fit, predictions = as.numeric(fc$mean), lower = as.numeric(fc$lower[, 2]), upper = as.numeric(fc$upper[, 2]), method = "SARIMA (Fourier)")
-}
-forecast_hourly_ets <- function(hourly_df, horizon_h = 24, target = "temperature") {
-  vals <- hourly_df[[target]]
-  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
-  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
-  
-  # استفاده از ۳۳۶ داده (۱۴ روز اخیر) به جای ۳۰ روز برای حساسیت بهتر به روند جدید
-  if (length(vals) > 336) vals <- tail(vals, 336)
-  
-  ts_obj <- forecast::msts(vals, seasonal.periods = 24)
-  
-  fc <- tryCatch({
-    # استفاده از stlf با پنجره فصلی ۷ روزه جهت تطبیق با آخرین تغییرات اقلیمی
-    forecast::stlf(
-      ts_obj, 
-      method = "ets", 
-      etsmodel = "ZAA",
-      s.window = 7,       # الگوی فصلی پویا بر اساس هفته اخیر
-      robust = TRUE,      # مقاومت در برابر داده‌های پرت
-      h = horizon_h
-    )
-  }, error = function(e) NULL)
-  
-  if (is.null(fc)) {
-    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
-  }
-  
-  preds <- as.numeric(fc$mean)
-  
-  # همترازی نقطه شروع پیش‌بینی با آخرین دمای واقعی ثبت‌شده (Offset Adjustment)
-  last_real <- tail(vals, 1)
-  first_pred <- preds[1]
-  offset <- (last_real - first_pred) * 0.4  # اصلاح نرم گاف اولیه
-  
-  preds <- preds + offset
-  
-  lower_vals <- tryCatch({
-    as.numeric(fc$lower[, 2]) + offset
-  }, error = function(e) preds - 1.96 * sd(vals, na.rm = TRUE))
-  
-  upper_vals <- tryCatch({
-    as.numeric(fc$upper[, 2]) + offset
-  }, error = function(e) preds + 1.96 * sd(vals, na.rm = TRUE))
-  
-  if (length(preds) != horizon_h || any(!is.finite(preds))) {
-    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
-  }
   
   list(
-    predictions = preds,
-    lower       = lower_vals,
-    upper       = upper_vals,
-    method      = "ETS Adaptive STLF"
+    model = fit, 
+    predictions = as.numeric(fc$mean), 
+    lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), 
+    upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), 
+    method = "SARIMA (Fourier)"
   )
 }
+
+# ── اضافه شدن تابع ETS روزانه که فراموش شده بود ──
+forecast_ets <- function(train_df, horizon, target = "temperature") {
+  ts_data <- prepare_ts_data(train_df, variable = target, freq = 365)
+  fit <- tryCatch(forecast::ets(ts_data), error = function(e) NULL)
+  if (is.null(fit)) stop("ETS شکست خورد")
+  fc <- forecast::forecast(fit, h = horizon)
+  list(model = fit, predictions = as.numeric(fc$mean), lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), method = "ETS")
+}
+
 forecast_tbats <- function(train_df, horizon, target = "temperature") {
   msts_data <- forecast::msts(train_df[[target]], seasonal.periods = c(7, 365.25))
   if (length(msts_data) > 1095) {
@@ -102,7 +110,24 @@ forecast_tbats <- function(train_df, horizon, target = "temperature") {
   )
   if (is.null(fit)) stop("TBATS شکست خورد")
   fc <- forecast::forecast(fit, h = horizon)
-  list(model = fit, predictions = as.numeric(fc$mean), lower = as.numeric(fc$lower[, 2]), upper = as.numeric(fc$upper[, 2]), method = "TBATS")
+  list(model = fit, predictions = as.numeric(fc$mean), lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), method = "TBATS")
+}
+
+# ── اضافه شدن تابع Prophet روزانه که فراموش شده بود ──
+forecast_prophet <- function(train_df, horizon, target = "temperature") {
+  df <- data.frame(ds = as.POSIXct(train_df$date), y = train_df[[target]])
+  df <- df[!is.na(df$y), ]
+  if (nrow(df) < 30) stop("داده کافی برای Prophet نیست")
+  
+  m <- tryCatch({
+    prophet_model <- prophet::prophet(yearly.seasonality = TRUE, weekly.seasonality = TRUE, daily.seasonality = FALSE, interval.width = 0.95)
+    prophet::fit.prophet(prophet_model, df)
+  }, error = function(e) NULL)
+  
+  if (is.null(m)) stop("Prophet شکست خورد")
+  future <- data.frame(ds = seq(max(df$ds) + 86400, by = "day", length.out = horizon))
+  forecast_df <- stats::predict(m, future)
+  list(model = m, predictions = as.numeric(forecast_df$yhat), lower = as.numeric(forecast_df$yhat_lower), upper = as.numeric(forecast_df$yhat_upper), method = "Prophet")
 }
 
 # ── پیش‌بینی ساعتی Prophet با متغیرهای کمکی (Multivariate) ───────────────────
@@ -113,7 +138,6 @@ forecast_hourly_prophet <- function(hourly_df, horizon_h = 24, target = "tempera
   
   if (nrow(df) > 336) df <- tail(df, 336)
   
-  # اضافه کردن رطوبت به عنوان متغیر کمکی (اگر وجود داشته باشد)
   use_humidity <- "humidity" %in% names(hourly_df)
   if (use_humidity) {
     df$humidity <- hourly_df$humidity[match(df$ds, hourly_df$timestamp)]
@@ -128,10 +152,7 @@ forecast_hourly_prophet <- function(hourly_df, horizon_h = 24, target = "tempera
   
   if (is.null(m)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — Prophet"))
   
-  # ساخت زمان‌های آینده
   future <- data.frame(ds = seq(max(df$ds) + 3600, by = 3600, length.out = horizon_h))
-  
-  # پیش‌بینی مقدار رطوبت برای آینده (تکرار الگوی ۲۴ ساعت گذشته)
   if (use_humidity) {
     last_day_humidity <- tail(df$humidity, 24)
     future$humidity <- rep(last_day_humidity, length.out = horizon_h)
@@ -140,7 +161,6 @@ forecast_hourly_prophet <- function(hourly_df, horizon_h = 24, target = "tempera
   forecast_df <- stats::predict(m, future)
   preds <- as.numeric(forecast_df$yhat)
   
-  # محدودکننده فیزیکی
   recent_vals <- tail(df$y, 48)
   hard_min <- min(recent_vals, na.rm = TRUE) - 2
   hard_max <- max(recent_vals, na.rm = TRUE) + 2
@@ -153,7 +173,48 @@ forecast_hourly_prophet <- function(hourly_df, horizon_h = 24, target = "tempera
     upper       = as.numeric(forecast_df$yhat_upper),
     method      = "Prophet (Multivariate)"
   )
-}# ════════════════════════════════════════════════════════════════════════════
+}
+
+forecast_hourly_ets <- function(hourly_df, horizon_h = 24, target = "temperature") {
+  vals <- hourly_df[[target]]
+  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
+  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
+  if (length(vals) > 720) vals <- tail(vals, 720)
+  
+  if (length(vals) >= 3) {
+    vals_smoothed <- zoo::rollmean(vals, k = 3, fill = NA, align = "right")
+    vals_smoothed[is.na(vals_smoothed)] <- vals[is.na(vals_smoothed)]
+  } else {
+    vals_smoothed <- vals
+  }
+  ts_obj <- ts(vals_smoothed, frequency = 24)
+  
+  # استفاده مستقیم از ets با اجازه انتخاب مدل بهینه (ZZZ) به جای stlf
+  fc <- tryCatch(
+    forecast::forecast(forecast::ets(ts_obj), h = horizon_h),
+    error = function(e) tryCatch(
+      forecast::stlf(ts_obj, h = horizon_h, method = "ets", s.window = 7, robust = TRUE), 
+      error = function(e2) NULL
+    )
+  )
+  
+  if (is.null(fc)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
+  
+  lower_vals <- tryCatch({ if (is.matrix(fc$lower)) as.numeric(fc$lower[, 2]) else as.numeric(fc$lower) }, error = function(e) rep(NA_real_, horizon_h))
+  upper_vals <- tryCatch({ if (is.matrix(fc$upper)) as.numeric(fc$upper[, 2]) else as.numeric(fc$upper) }, error = function(e) rep(NA_real_, horizon_h))
+  preds <- as.numeric(fc$mean)
+  
+  if (length(preds) != horizon_h || any(!is.finite(preds))) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
+  if (any(!is.finite(lower_vals)) || length(lower_vals) != horizon_h) {
+    sd_val <- ifelse(sd(vals, na.rm = TRUE) > 0, sd(vals, na.rm = TRUE), 1)
+    lower_vals <- preds - 1.96 * sd_val
+    upper_vals <- preds + 1.96 * sd_val
+  }
+  
+  list(predictions = preds, lower = lower_vals, upper = upper_vals, method = "ETS (Hourly)")
+}
+
+# ════════════════════════════════════════════════════════════════════════════
 # بخش ۲: Helperهای مشترک برای مدل‌های ML روزانه
 # ════════════════════════════════════════════════════════════════════════════
 recursive_feature_forecast <- function(predict_fn, train_df, horizon, target, feat_cols, lag_days = c(1, 2, 3, 7, 14, 21)) {
@@ -298,7 +359,7 @@ forecast_svm <- function(train_df, horizon, target = "temperature") {
 forecast_naive <- function(train_df, horizon, target = "temperature") {
   ts_data <- prepare_ts_data(train_df, variable = target, freq = 7)
   fit <- forecast::naive(ts_data, h = horizon)
-  list(model = fit, predictions = as.numeric(fit$mean), lower = as.numeric(fit$lower[, 2]), upper = as.numeric(fit$upper[, 2]), method = "Naïve")
+  list(model = fit, predictions = as.numeric(fit$mean), lower = as.numeric(if(is.matrix(fit$lower)) fit$lower[,2] else fit$lower), upper = as.numeric(if(is.matrix(fit$upper)) fit$upper[,2] else fit$upper), method = "Naïve")
 }
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -369,29 +430,6 @@ extract_automl_forecast <- function(automl_result) {
 # بخش ۶: پیش‌بینی ساعتی — آموزش روی داده ساعتی با featureهای زمانی
 # ════════════════════════════════════════════════════════════════════════════
 
-build_hourly_feature_matrix <- function(df, target = "temperature", lag_hours = c(1, 2, 3, 24)) {
-  df <- df %>%
-    dplyr::arrange(timestamp) %>%
-    dplyr::mutate(
-      hour = lubridate::hour(timestamp), hour_sin = sin(2 * pi * hour / 24), hour_cos = cos(2 * pi * hour / 24),
-      day_of_week = lubridate::wday(timestamp), day_of_year = lubridate::yday(timestamp), month = lubridate::month(timestamp),
-      sin_annual = sin(2 * pi * day_of_year / 365), cos_annual = cos(2 * pi * day_of_year / 365),
-      sin_weekly = sin(2 * pi * day_of_week / 7), cos_weekly = cos(2 * pi * day_of_week / 7)
-    )
-  for (lg in lag_hours) {
-    df[[paste0("lag_", lg, "h")]] <- dplyr::lag(df[[target]], lg)
-  }
-  df$rolling_6h <- zoo::rollmean(df[[target]], k = 6, fill = NA, align = "right")
-  df$rolling_24h <- zoo::rollmean(df[[target]], k = 24, fill = NA, align = "right")
-  df %>% tidyr::drop_na()
-}
-
-HOURLY_FEAT_COLS <- c(
-  "hour", "hour_sin", "hour_cos", "day_of_week", "month", "sin_annual", "cos_annual", "sin_weekly", "cos_weekly",
-  "lag_1h", "lag_2h", "lag_3h", "lag_24h", "rolling_6h", "rolling_24h",
-  "temperature", "humidity", "wind_speed", "precipitation"
-)
-
 .prepare_hourly_training_data <- function(hourly_df, target = "temperature", use_multivariate = FALSE) {
   if (nrow(hourly_df) > 1440) hourly_df <- tail(hourly_df, 1440)
   feat_df <- build_hourly_feature_matrix(hourly_df, target)
@@ -445,6 +483,13 @@ hourly_recursive_forecast <- function(predict_fn, model, train_df, horizon_h, ta
       lag_1h = get_lag(1), lag_2h = get_lag(2), lag_3h = get_lag(3), lag_24h = get_lag(24),
       rolling_6h = roll_6h, rolling_24h = roll_24h
     )
+    
+    # اصلاح باگ ۴: تضمین وجود تمام ستون‌های مورد نیاز مدل ML
+    for (fc in feat_use) {
+      if (!fc %in% names(newrow)) {
+        newrow[[fc]] <- if (fc %in% names(train_df)) tail(train_df[[fc]], 1) else 0
+      }
+    }
     
     if (!is.null(last_exog)) {
       for (ev in active_exog_vars) {
@@ -545,19 +590,49 @@ forecast_hourly_catboost <- function(hourly_df, horizon_h = 24, target = "temper
     split <- .train_valid_split_idx(nrow(prep$X_train))
     train_idx <- if (!is.null(split)) split$train_idx else seq_len(nrow(prep$X_train))
     train_pool <- catboost::catboost.load_pool(data = as.data.frame(prep$X_train[train_idx, , drop = FALSE]), label = prep$y_train[train_idx])
-    params <- list(loss_function = "RMSE", iterations = 500, depth = 8, learning_rate = 0.05, l2_leaf_reg = 3, logging_level = "Silent")
+    
+    # اصلاح پارامترها: کاهش depth به 6 برای جلوگیری از Overfitting روی داده ساعتی
+    params <- list(
+      loss_function = "RMSE", 
+      iterations = 1000, 
+      depth = 6, 
+      learning_rate = 0.05, 
+      l2_leaf_reg = 3, 
+      logging_level = "Silent",
+      od_type = "Iter",
+      od_wait = 30
+    )
+    
     if (!is.null(split)) {
       valid_pool <- catboost::catboost.load_pool(data = as.data.frame(prep$X_train[split$valid_idx, , drop = FALSE]), label = prep$y_train[split$valid_idx])
-      params$early_stopping_rounds <- 20
-      model <- catboost::catboost.train(train_pool, valid_pool, params = params)
+      fit <- catboost::catboost.train(train_pool, valid_pool, params = params)
     } else {
-      params$iterations <- 150
-      model <- catboost::catboost.train(train_pool, params = params)
+      params$iterations <- 200
+      fit <- catboost::catboost.train(train_pool, params = params)
     }
-    preds <- hourly_recursive_forecast(predict_fn = function(m, nd) { pool <- catboost::catboost.load_pool(data = as.data.frame(data.matrix(nd[, prep$feat_use, drop = FALSE]))); catboost::catboost.predict(m, pool) }, model = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = prep$feat_use)
-    imp <- tryCatch(catboost::catboost.get_feature_importance(model), error = function(e) NULL)
-    list(predictions = preds, method = paste0("CatBoost (ساعتی", ifelse(isTRUE(use_multivariate), "، چندمتغیره)", ")")), feat_imp = if (!is.null(imp)) data.frame(Feature = colnames(prep$X_train), Gain = imp) else NULL)
-  }, error = function(e) { message("CatBoost ساعتی شکست خورد: ", conditionMessage(e)); NULL })
+    
+    preds <- hourly_recursive_forecast(
+      predict_fn = function(m, nd) { 
+        pool <- catboost::catboost.load_pool(data = as.data.frame(data.matrix(nd[, prep$feat_use, drop = FALSE]))); 
+        catboost::catboost.predict(m, pool) 
+      }, 
+      model = fit, 
+      train_df = prep$hourly_df, 
+      horizon_h = horizon_h, 
+      target = target, 
+      feat_use = prep$feat_use
+    )
+    
+    imp <- tryCatch(catboost::catboost.get_feature_importance(fit), error = function(e) NULL)
+    list(
+      predictions = preds, 
+      method = paste0("CatBoost (ساعتی", ifelse(isTRUE(use_multivariate), "، چندمتغیره)", ")")), 
+      feat_imp = if (!is.null(imp)) data.frame(Feature = colnames(prep$X_train), Gain = imp) else NULL
+    )
+  }, error = function(e) { 
+    message("CatBoost ساعتی شکست خورد: ", conditionMessage(e)); NULL 
+  })
+  
   if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — CatBoost"))
   result
 }
@@ -585,7 +660,7 @@ forecast_hourly_arima <- function(hourly_df, horizon_h = 24, target = "temperatu
   if (is.null(fit)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ARIMA"))
   fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
   if (is.null(fc)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ARIMA"))
-  list(predictions = as.numeric(fc$mean), lower = as.numeric(fc$lower[, 2]), upper = as.numeric(fc$upper[, 2]), method = "ARIMA (ساعتی)")
+  list(predictions = as.numeric(fc$mean), lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), method = "ARIMA (ساعتی)")
 }
 
 forecast_hourly_sarima <- function(hourly_df, horizon_h = 24, target = "temperature") {
@@ -593,44 +668,28 @@ forecast_hourly_sarima <- function(hourly_df, horizon_h = 24, target = "temperat
   vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
   vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
   if (length(vals) > 720) vals <- tail(vals, 720)
+  
   ts_obj <- ts(vals, frequency = 24)
-  fit <- tryCatch(forecast::Arima(ts_obj, order = c(1, 0, 1), seasonal = list(order = c(1, 0, 1), period = 24)), error = function(e) tryCatch(forecast::Arima(ts_obj, order = c(1, 1, 1)), error = function(e2) tryCatch(forecast::auto.arima(tail(ts_obj, 168), seasonal = FALSE, stepwise = TRUE, approximation = TRUE), error = function(e3) NULL)))
+  
+  # استفاده از auto.arima برای پیدا کردن پارامترهای بهینه به جای اجبار دستی
+  fit <- tryCatch(
+    forecast::auto.arima(ts_obj, seasonal = TRUE, D = 1, stepwise = TRUE, approximation = TRUE),
+    error = function(e) tryCatch(
+      forecast::Arima(ts_obj, order = c(1,1,1), seasonal = list(order = c(0,1,1), period = 24)), 
+      error = function(e2) NULL
+    )
+  )
+  
   if (is.null(fit)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SARIMA"))
   fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
   if (is.null(fc)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SARIMA"))
-  list(predictions = as.numeric(fc$mean), lower = as.numeric(fc$lower[, 2]), upper = as.numeric(fc$upper[, 2]), method = "SARIMA (ساعتی)")
-}
-
-forecast_hourly_ets <- function(hourly_df, horizon_h = 24, target = "temperature") {
-  vals <- hourly_df[[target]]
-  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
-  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
-  if (length(vals) > 720) vals <- tail(vals, 720)
   
-  # نرم‌سازی برای ETS
-  if (length(vals) >= 3) {
-    vals_smoothed <- zoo::rollmean(vals, k = 3, fill = NA, align = "right")
-    vals_smoothed[is.na(vals_smoothed)] <- vals[is.na(vals_smoothed)]
-  } else {
-    vals_smoothed <- vals
-  }
-  ts_obj <- ts(vals_smoothed, frequency = 24)
-  
-  fc <- tryCatch(forecast::stlf(ts_obj, h = horizon_h, method = "ets", s.window = 7, robust = TRUE), error = function(e) tryCatch(forecast::forecast(forecast::ets(ts_obj, model = "AAA"), h = horizon_h), error = function(e2) tryCatch(forecast::forecast(forecast::ets(ts_obj, model = "AAN"), h = horizon_h), error = function(e3) NULL)))
-  if (is.null(fc)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
-  
-  lower_vals <- tryCatch({ if (is.matrix(fc$lower)) as.numeric(fc$lower[, 2]) else as.numeric(fc$lower) }, error = function(e) rep(NA_real_, horizon_h))
-  upper_vals <- tryCatch({ if (is.matrix(fc$upper)) as.numeric(fc$upper[, 2]) else as.numeric(fc$upper) }, error = function(e) rep(NA_real_, horizon_h))
-  preds <- as.numeric(fc$mean)
-  
-  if (length(preds) != horizon_h || any(!is.finite(preds))) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
-  if (any(!is.finite(lower_vals)) || length(lower_vals) != horizon_h) {
-    sd_val <- ifelse(sd(vals, na.rm = TRUE) > 0, sd(vals, na.rm = TRUE), 1)
-    lower_vals <- preds - 1.96 * sd_val
-    upper_vals <- preds + 1.96 * sd_val
-  }
-  
-  list(predictions = preds, lower = lower_vals, upper = upper_vals, method = "ETS (Hourly Smoothed)")
+  list(
+    predictions = as.numeric(fc$mean), 
+    lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), 
+    upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), 
+    method = "SARIMA (ساعتی)"
+  )
 }
 
 forecast_hourly_tbats <- function(hourly_df, horizon_h = 24, target = "temperature") {
@@ -643,12 +702,7 @@ forecast_hourly_tbats <- function(hourly_df, horizon_h = 24, target = "temperatu
   if (is.null(fit)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — TBATS"))
   fc <- tryCatch(forecast::forecast(fit, h = horizon_h), error = function(e) NULL)
   if (is.null(fc)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — TBATS"))
-  list(predictions = as.numeric(fc$mean), lower = as.numeric(fc$lower[, 2]), upper = as.numeric(fc$upper[, 2]), method = if (inherits(fit, "tbats")) "TBATS (ساعتی)" else "BATS (ساعتی)")
-}
-
-forecast_hourly_prophet <- function(hourly_df, horizon_h = 24, target = "temperature") {
-  # Prophet ساعتی به دلیل حساسیت به فرمت timestamp مستقیماً به fallback سپرده می‌شود
-  return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — Prophet"))
+  list(predictions = as.numeric(fc$mean), lower = as.numeric(if(is.matrix(fc$lower)) fc$lower[,2] else fc$lower), upper = as.numeric(if(is.matrix(fc$upper)) fc$upper[,2] else fc$upper), method = if (inherits(fit, "tbats")) "TBATS (ساعتی)" else "BATS (ساعتی)")
 }
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -657,7 +711,6 @@ forecast_hourly_prophet <- function(hourly_df, horizon_h = 24, target = "tempera
 run_hourly_model <- function(model_name, hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   mn <- tolower(trimws(model_name))
   
-  # تبدیل اجباری timestamp به POSIXct برای جلوگیری از خطای non-numeric
   hourly_df$timestamp <- as.POSIXct(hourly_df$timestamp, tz = "Asia/Tehran")
   
   if (nrow(hourly_df) < 48) stop("حداقل ۴۸ ردیف ساعتی برای آموزش نیاز است.")
