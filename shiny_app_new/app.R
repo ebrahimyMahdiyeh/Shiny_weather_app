@@ -1,6 +1,6 @@
 # File: app.R — نسخه ۴ (Dark/Light mode + سایدبار راست)
 
-# ── اصلاح locale برای پشتیبانی فارسی (UTF-8) ────────────────────────────────
+# ── اصلاح locale برای پشتیبانی فارسی (UTF-8) ────────────────────────────────د
 tryCatch({
   if (.Platform$OS.type == "windows") {
     locs <- c("Persian_Iran.65001", "English_United States.65001",
@@ -807,7 +807,7 @@ ui <- shinydashboard::dashboardPage(
                       tags$span(class="status-dot"),
                       tags$span(style="color:var(--text2);","۵ ایستگاه فعال")
              ),
-             tags$div(style="font-size:12px;color:var(--text3);","داده: ۲۰۲۱–۲۰۲۵"),
+             tags$div(style="font-size:12px;color:var(--text3);","داده: ۲۰۲۱–۲۰۲۶"),
              tags$div(style="margin-top:6px;display:inline-block;background:rgba(59,130,246,.1);color:#60a5fa;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;",
                       "v1.0 · R Shiny")
     )

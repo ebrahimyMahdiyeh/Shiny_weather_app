@@ -83,7 +83,7 @@ forecast_prophet <- function(train_df, horizon, target = "temperature") {
 # بخش ۲: Helperهای مشترک برای مدل‌های ML روزانه
 # ════════════════════════════════════════════════════════════════════════════
 
-# ── ساخت ماتریس ویژگی برای مدل‌های ML روزانه (با ویژگی‌های نوسان) ──────────────
+# ── ساخت ماتریس ویژگی برای مدل‌های ML روزانه (با ویژگی‌های نوسان و متغیرهای کمکی) ─
 build_feature_matrix <- function(df, target = "temperature", lag_days = c(1, 2, 3, 7, 14)) {
   df <- df %>% dplyr::arrange(date) %>% add_calendar_features()
   df$t <- seq_len(nrow(df)) # روند خطی
@@ -94,12 +94,20 @@ build_feature_matrix <- function(df, target = "temperature", lag_days = c(1, 2, 
     df[[paste0("lag_", lag)]] <- dplyr::lag(df[[target]], lag)
   }
   
+  # 🔴 اضافه شدن لگ‌های متغیرهای کمکی (Covariates)
+  exog_vars <- intersect(c("humidity", "wind_speed", "precipitation", "pressure", "temp_min", "temp_max"), names(df))
+  exog_vars <- setdiff(exog_vars, target)
+  for (ex in exog_vars) {
+    for (lag in lag_days) {
+      df[[paste0(ex, "_lag_", lag)]] <- dplyr::lag(df[[ex]], lag)
+    }
+  }
+  
   df$rolling_mean_7  <- zoo::rollmean(df[[target]], k = 7,  fill = NA, align = "right")
   df$rolling_mean_14 <- zoo::rollmean(df[[target]], k = 14, fill = NA, align = "right")
   df$rolling_mean_30 <- zoo::rollmean(df[[target]], k = 30, fill = NA, align = "right")
   df$rolling_sd_7    <- zoo::rollapply(df[[target]], width = 7, FUN = sd, fill = NA, align = "right")
   
-  # 🔴 ویژگی‌های نوسان و جهت (برای درک بهتر روند توسط درختان تصمیم)
   df$rolling_max_7   <- zoo::rollapply(df[[target]], width = 7, FUN = max, fill = NA, align = "right")
   df$rolling_min_7   <- zoo::rollapply(df[[target]], width = 7, FUN = min, fill = NA, align = "right")
   df$rolling_range_7 <- df$rolling_max_7 - df$rolling_min_7
@@ -192,20 +200,37 @@ recursive_feature_forecast <- function(predict_fn, train_df, horizon, target, fe
   
   list(train_data = train_data, last_row_data = last_row_data, feat_cols = feat_cols)
 }
-# ── پیش‌بینی Direct Multi-Horizon (بدون بازگشت) ──
+# ── پیش‌بینی Direct Multi-Horizon (بر اساس ناهنجاری - Anomaly) برای تمام مدل‌ها ──
 forecast_direct_ml <- function(train_df, horizon, target = "temperature", model_type = "xgboost") {
+  
+  model_type <- tolower(trimws(model_type))
+  supported_direct_models <- c("xgboost", "lightgbm", "catboost", "rf", "svm")
+  
+  if (!model_type %in% supported_direct_models) {
+    return(run_model_by_name(model_type, train_df, horizon, target))
+  }
+  
   tryCatch({
+    # ۱. محاسبه میانگین اقلیمی (Climatology) برای هر روز سال
+    train_df$yday <- lubridate::yday(train_df$date)
+    clim <- train_df %>% dplyr::group_by(yday) %>% dplyr::summarise(clim_val = mean(!!sym(target), na.rm = TRUE), .groups = "drop")
+    
+    # جایگزینی دمای خام با ناهنجاری (Anomaly)
+    train_df$target_raw <- train_df[[target]]
+    train_df$target_anom <- train_df$target_raw - clim$clim_val[match(train_df$yday, clim$yday)]
+    train_df[[target]] <- train_df$target_anom # مدل روی ناهنجاری آموزش می‌بیند!
+    
     prep <- .prepare_direct_training_data(train_df, target, horizon)
     train_data <- prep$train_data
     last_row_data <- prep$last_row_data
     feat_cols <- prep$feat_cols
     
-    if (nrow(train_data) == 0 || nrow(last_row_data) == 0 || length(feat_cols) == 0) stop("داده کافی برای Direct ML نیست")
+    if (nrow(train_data) == 0 || nrow(last_row_data) == 0 || length(feat_cols) == 0) stop("داده کافی نیست")
     
     X_train_all <- as.matrix(train_data[, feat_cols, drop = FALSE])
     last_row <- as.matrix(last_row_data[, feat_cols, drop = FALSE])
     
-    preds <- numeric(horizon)
+    preds_anom <- numeric(horizon)
     ci_lower <- numeric(horizon)
     ci_upper <- numeric(horizon)
     
@@ -214,27 +239,57 @@ forecast_direct_ml <- function(train_df, horizon, target = "temperature", model_
       y_train <- train_data[[target_col]]
       
       set.seed(42)
+      split <- .train_valid_split_idx(nrow(X_train_all))
+      resid_sd <- 1
       
       if (model_type == "xgboost") {
-        dtr <- xgboost::xgb.DMatrix(X_train_all, label = y_train)
-        fit <- xgboost::xgb.train(params = list(objective = "reg:squarederror", max_depth = 6, eta = 0.1, nrounds = 150, verbose = 0), data = dtr)
-        preds[h] <- stats::predict(fit, xgboost::xgb.DMatrix(last_row))
-        train_preds <- stats::predict(fit, dtr)
-      } else if (model_type == "rf") {
-        fit <- ranger::ranger(x = X_train_all, y = y_train, num.trees = 300, min.node.size = 5, seed = 42)
-        preds[h] <- stats::predict(fit, data = as.data.frame(last_row))$predictions[1]
-        train_preds <- fit$predictions
+        params <- list(objective = "reg:squarederror", max_depth = 6, eta = 0.05, subsample = 0.8, colsample_bytree = 0.8, min_child_weight = 5, gamma = 0.1)
+        if (!is.null(split)) {
+          dtr <- xgboost::xgb.DMatrix(X_train_all[split$train_idx, , drop=FALSE], label = y_train[split$train_idx])
+          dva <- xgboost::xgb.DMatrix(X_train_all[split$valid_idx, , drop=FALSE], label = y_train[split$valid_idx])
+          fit <- xgboost::xgb.train(params = params, data = dtr, nrounds = 1000, watchlist = list(train = dtr, valid = dva), early_stopping_rounds = 30, verbose = 0)
+          val_preds <- stats::predict(fit, dva)
+          resid_sd <- sd(y_train[split$valid_idx] - val_preds, na.rm = TRUE)
+        } else {
+          dtr <- xgboost::xgb.DMatrix(X_train_all, label = y_train)
+          fit <- xgboost::xgb.train(params = params, data = dtr, nrounds = 150, verbose = 0)
+        }
+        preds_anom[h] <- stats::predict(fit, xgboost::xgb.DMatrix(last_row))
+        
       } else if (model_type == "lightgbm") {
-        dtr <- lightgbm::lgb.Dataset(X_train_all, label = y_train)
-        fit <- lightgbm::lgb.train(params = list(objective = "regression", metric = "rmse", num_leaves = 31, max_depth = 6, learning_rate = 0.1, verbose = -1), data = dtr, nrounds = 100)
-        preds[h] <- stats::predict(fit, last_row)
-        train_preds <- stats::predict(fit, X_train_all)
+        params <- list(objective = "regression", metric = "rmse", num_leaves = 31, max_depth = 6, learning_rate = 0.05, feature_fraction = 0.8, bagging_fraction = 0.8, bagging_freq = 1, min_data_in_leaf = 10, verbose = -1)
+        if (!is.null(split)) {
+          dtr <- lightgbm::lgb.Dataset(X_train_all[split$train_idx, , drop=FALSE], label = y_train[split$train_idx])
+          dva <- lightgbm::lgb.Dataset.create.valid(dtr, X_train_all[split$valid_idx, , drop=FALSE], label = y_train[split$valid_idx])
+          fit <- lightgbm::lgb.train(params = params, data = dtr, nrounds = 1000, valids = list(valid = dva), early_stopping_rounds = 30)
+          val_preds <- stats::predict(fit, X_train_all[split$valid_idx, , drop=FALSE])
+          resid_sd <- sd(y_train[split$valid_idx] - val_preds, na.rm = TRUE)
+        } else {
+          dtr <- lightgbm::lgb.Dataset(X_train_all, label = y_train)
+          fit <- lightgbm::lgb.train(params = params, data = dtr, nrounds = 100)
+        }
+        preds_anom[h] <- stats::predict(fit, last_row)
+        
       } else if (model_type == "catboost") {
-        train_pool <- catboost::catboost.load_pool(data = as.data.frame(X_train_all), label = y_train)
+        params <- list(loss_function = "RMSE", iterations = 1000, depth = 6, learning_rate = 0.05, l2_leaf_reg = 3, logging_level = "Silent", random_seed = 42, od_type = "Iter", od_wait = 30)
+        if (!is.null(split)) {
+          train_pool <- catboost::catboost.load_pool(data = as.data.frame(X_train_all[split$train_idx, , drop=FALSE]), label = y_train[split$train_idx])
+          valid_pool <- catboost::catboost.load_pool(data = as.data.frame(X_train_all[split$valid_idx, , drop=FALSE]), label = y_train[split$valid_idx])
+          fit <- catboost::catboost.train(train_pool, valid_pool, params = params)
+          val_preds <- catboost::catboost.predict(fit, valid_pool)
+          resid_sd <- sd(y_train[split$valid_idx] - val_preds, na.rm = TRUE)
+        } else {
+          train_pool <- catboost::catboost.load_pool(data = as.data.frame(X_train_all), label = y_train)
+          fit <- catboost::catboost.train(train_pool, params = list(loss_function = "RMSE", iterations = 150, depth = 6, learning_rate = 0.05, logging_level = "Silent", random_seed = 42))
+        }
         test_pool <- catboost::catboost.load_pool(data = as.data.frame(last_row))
-        fit <- catboost::catboost.train(train_pool, params = list(loss_function = "RMSE", iterations = 150, depth = 6, learning_rate = 0.1, logging_level = "Silent", random_seed = 42))
-        preds[h] <- catboost::catboost.predict(fit, test_pool)
-        train_preds <- catboost::catboost.predict(fit, train_pool)
+        preds_anom[h] <- catboost::catboost.predict(fit, test_pool)
+        
+      } else if (model_type == "rf") {
+        fit <- ranger::ranger(x = X_train_all, y = y_train, num.trees = 500, min.node.size = 5, seed = 42, importance = "impurity")
+        preds_anom[h] <- stats::predict(fit, data = as.data.frame(last_row))$predictions[1]
+        resid_sd <- sqrt(fit$prediction.error) # OOB error for CI
+        
       } else if (model_type == "svm") {
         means <- colMeans(X_train_all, na.rm = TRUE)
         sds <- apply(X_train_all, 2, sd, na.rm = TRUE)
@@ -243,22 +298,32 @@ forecast_direct_ml <- function(train_df, horizon, target = "temperature", model_
         last_row_scaled <- scale(last_row, center = means, scale = sds)
         
         fit <- e1071::svm(x = X_train_scaled, y = y_train, kernel = "radial", cost = 10, epsilon = 0.1)
-        preds[h] <- stats::predict(fit, newdata = last_row_scaled)
+        preds_anom[h] <- stats::predict(fit, newdata = last_row_scaled)
         train_preds <- stats::predict(fit, newdata = X_train_scaled)
-      } else {
-        stop("مدل پشتیبانی نمی شود")
+        resid_sd <- sd(y_train - train_preds, na.rm = TRUE)
       }
       
-      resid_sd <- sd(y_train - train_preds, na.rm = TRUE)
       if (!is.finite(resid_sd) || resid_sd == 0) resid_sd <- 1
-      ci_lower[h] <- preds[h] - 1.96 * resid_sd
-      ci_upper[h] <- preds[h] + 1.96 * resid_sd
+      growth <- sqrt(h)
+      ci_lower[h] <- preds_anom[h] - 1.96 * resid_sd * growth
+      ci_upper[h] <- preds_anom[h] + 1.96 * resid_sd * growth
     }
     
-    list(predictions = preds, lower = ci_lower, upper = ci_upper, method = paste0(toupper(model_type), " (Direct)"), feat_imp = NULL)
+    # ۲. تبدیل ناهنجاری پیش‌بینی شده به دمای واقعی (اضافه کردن میانگین اقلیمی آینده)
+    last_date <- max(train_df$date)
+    future_dates <- seq.Date(last_date + 1, by = "day", length.out = horizon)
+    future_ydays <- lubridate::yday(future_dates)
+    future_clim <- clim$clim_val[match(future_ydays, clim$yday)]
+    future_clim[is.na(future_clim)] <- mean(clim$clim_val, na.rm = TRUE) # در صورت کبیسه
+    
+    preds_actual <- preds_anom + future_clim
+    ci_lower_actual <- ci_lower + future_clim
+    ci_upper_actual <- ci_upper + future_clim
+    
+    list(predictions = preds_actual, lower = ci_lower_actual, upper = ci_upper_actual, method = paste0(toupper(model_type), " (Anomaly)"), feat_imp = NULL)
+    
   }, error = function(e) {
-    message("Direct ML failed, falling back to Recursive: ", e$message)
-    # 🔴 اگر Direct خطا داد، از روش بازگشتی استفاده کن تا اپلیکیشن نشکند
+    message("Anomaly Direct ML failed for ", model_type, ", falling back to Recursive: ", e$message)
     run_model_by_name(model_type, train_df, horizon, target)
   })
 }

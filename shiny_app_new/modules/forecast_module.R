@@ -558,23 +558,28 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         all_feat_imp  <- list() 
         
         # ── آماده‌سازی مستقیم داده روزانه برای مکس و مین ──
+        # ── آماده‌سازی مستقیم داده روزانه برای مکس و مین ──
         daily_df <- NULL
         if (target == "temperature") {
           raw_daily <- weather_data()[[sid]]
           if (!is.null(raw_daily) && nrow(raw_daily) > 30 && all(c("temp_max", "temp_min") %in% names(raw_daily))) {
-            daily_df <- data.frame(
-              date = as.Date(raw_daily$date),
-              temp_max = as.numeric(raw_daily$temp_max),
-              temp_min = as.numeric(raw_daily$temp_min)
-            )
-            daily_df$temp_max[!is.finite(daily_df$temp_max)] <- NA
-            daily_df$temp_min[!is.finite(daily_df$temp_min)] <- NA
-            daily_df$temp_max <- zoo::na.locf(daily_df$temp_max, na.rm = FALSE)
-            daily_df$temp_max <- zoo::na.locf(daily_df$temp_max, fromLast = TRUE, na.rm = FALSE)
-            daily_df$temp_min <- zoo::na.locf(daily_df$temp_min, na.rm = FALSE)
-            daily_df$temp_min <- zoo::na.locf(daily_df$temp_min, fromLast = TRUE, na.rm = FALSE)
-            daily_df <- daily_df[complete.cases(daily_df), ]
-            daily_df$temp_min <- pmin(daily_df$temp_min, daily_df$temp_max)
+            
+            # 🔴 راهکار ۲: اجرای پاکسازی پیشرفته (حذف نویز و IQR) قبل از مدل‌سازی
+            daily_df <- tryCatch(advanced_clean_data(raw_daily), error = function(e) raw_daily)
+            
+            # اطمینان از صحت ستون‌ها و پر کردن ایمن مقادیر گمشده
+            if (!all(c("temp_max", "temp_min") %in% names(daily_df))) {
+              daily_df <- NULL
+            } else {
+              daily_df$temp_max[!is.finite(daily_df$temp_max)] <- NA
+              daily_df$temp_min[!is.finite(daily_df$temp_min)] <- NA
+              daily_df$temp_max <- zoo::na.locf(daily_df$temp_max, na.rm = FALSE)
+              daily_df$temp_max <- zoo::na.locf(daily_df$temp_max, fromLast = TRUE, na.rm = FALSE)
+              daily_df$temp_min <- zoo::na.locf(daily_df$temp_min, na.rm = FALSE)
+              daily_df$temp_min <- zoo::na.locf(daily_df$temp_min, fromLast = TRUE, na.rm = FALSE)
+              daily_df <- daily_df[complete.cases(daily_df[, c("date", "temp_max", "temp_min")]), ]
+              daily_df$temp_min <- pmin(daily_df$temp_min, daily_df$temp_max)
+            }
           }
         }
         
@@ -602,8 +607,8 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           # ── ۲. پیش‌بینی ۷ روز آینده (Direct Multi-Horizon روی مکس و مین) ──
           if (!is.null(daily_df) && nrow(daily_df) > 30) {
             
-            df_max <- daily_df[, c("date", "temp_max")]
-            df_min <- daily_df[, c("date", "temp_min")]
+            df_max <- daily_df
+            df_min <- daily_df
             
             # استفاده از موتور Direct برای مکس
             res_7d_max <- tryCatch(forecast_direct_ml(df_max, 7, target = "temp_max", model_type = mn), error = function(e) NULL)
@@ -617,15 +622,42 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               preds_max <- sanitize_vec(res_7d_max$predictions[1:7])
               preds_min <- sanitize_vec(res_7d_min$predictions[1:7])
               
-              # محدودسازی فیزیکی و منطق مین/مکس
-              hist_min <- min(daily_df$temp_min, na.rm = TRUE) - 5
-              hist_max <- max(daily_df$temp_max, na.rm = TRUE) + 5
-              preds_max <- pmin(pmax(preds_max, hist_min), hist_max)
-              preds_min <- pmin(pmax(preds_min, hist_min), hist_max)
-              preds_max <- pmax(preds_max, preds_min + 0.5) 
-              
               last_date <- max(daily_df$date)
               future_dates <- seq.Date(last_date + 1, by = "day", length.out = 7)
+              
+              # 🔴 محدودسازی فصلی (Seasonal Clamp)
+              future_doys <- lubridate::yday(future_dates)
+              hist_doys <- lubridate::yday(daily_df$date)
+              hist_bounds <- daily_df[sapply(hist_doys, function(d) any(abs(d - future_doys) <= 15)), ]
+              if (nrow(hist_bounds) == 0) hist_bounds <- daily_df
+              
+              recent_min <- min(hist_bounds$temp_min, na.rm = TRUE) - 3 
+              recent_max <- max(hist_bounds$temp_max, na.rm = TRUE) + 3 
+              
+              preds_max <- pmin(pmax(preds_max, recent_min), recent_max)
+              preds_min <- pmin(pmax(preds_min, recent_min), recent_max)
+              preds_max <- pmax(preds_max, preds_min + 0.5) 
+              
+              # 🔴 MOS Blending: ترکیب هوشمند مدل ML با فیزیک Open-Meteo
+              if (isTRUE(input$compare_om) && !is.null(ld) && !is.null(ld$daily) && nrow(ld$daily) > 0) {
+                om_future <- ld$daily[ld$daily$date %in% future_dates, ]
+                if (nrow(om_future) == 7) {
+                  # مدل ۵۰٪ از یادگیری محلی ML و ۵۰٪ از پیش‌بینی اتمسفری OM می‌گیرد
+                  preds_max <- (preds_max + as.numeric(om_future$temp_max)) / 2
+                  preds_min <- (preds_min + as.numeric(om_future$temp_min)) / 2
+                  preds_max <- pmax(preds_max, preds_min + 0.5) # حفظ منطق فیزیکی پس از ترکیب
+                }
+              }
+              
+              # 🔴 راهکار ۴: محدودسازی نوسان روزانه (نهایتاً ۳ درجه تغییر در روز)
+              for(i in 2:7) {
+                if (abs(preds_max[i] - preds_max[i-1]) > 3) {
+                  preds_max[i] <- preds_max[i-1] + sign(preds_max[i] - preds_max[i-1]) * 3
+                }
+                if (abs(preds_min[i] - preds_min[i-1]) > 3) {
+                  preds_min[i] <- preds_min[i-1] + sign(preds_min[i] - preds_min[i-1]) * 3
+                }
+              }
               
               all_preds_7d[[mn]] <- list(
                 dates = future_dates,
@@ -949,7 +981,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       models <- input$selected_models
       mlp <- hourly_ml_pred()
       if (is.null(models) || length(models) == 0 || is.null(mlp) || length(mlp$preds_list) == 0) {
-        return(tags$div(style="text-align:center; padding:90px; color:var(--text3); font-size:14px;", "روی «اجرای مدل» کلیک کنید تا پیش‌بینی ۲۴h ببینید"))
+        return(tags$div(style="text-align:center; padding:90px; color:var(--text3); font-size:14px;", "برای مشاهده نمودار پیش‌بینی ۲۴ ساعته، روی «اجرای مدل» کلیک کنید"))
       }
       plotly::plotlyOutput(ns("main_multimodel_chart"), height="350px")
     })
@@ -1094,8 +1126,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
                  tags$div(
                    style="display:flex;align-items:center;gap:8px;margin-bottom:12px;",
                    tags$i(class="fa fa-calendar-week",style="color:#fbbf24;font-size:14px;"),
-                   tags$span(class="fc-section-lbl", style="margin-bottom:0;", "پیش‌بینی ۷ روز (مدل روزانه)"),
-                   tags$span(style="font-size:12px; color:var(--text3); margin-right:auto;", "ناحیه سایه‌دار = افت دقت در آینده")
+                   tags$span(class="fc-section-lbl", style="margin-bottom:0;", "پیش‌بینی ۷ روز (مدل روزانه)")
                  ),
                  uiOutput(ns("daily_model_selector")),
                  plotly::plotlyOutput(ns("weekly_cone_chart"), height = "300px"),
@@ -1311,7 +1342,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       mlp <- hourly_ml_pred()
       if (is.null(mlp) || is.null(mlp$daily_preds) || length(mlp$daily_preds) == 0) {
         return(plotly::plot_ly(type="scatter", mode="lines") %>% 
-                 plotly::layout(annotations = list(text="مدلی برای پیش‌بینی ۷ روزه وجود ندارد", 
+                 plotly::layout(annotations = list(text= "برای مشاهده پیش‌بینی ۷ روزه، روی «اجرای مدل» کلیک کنید", 
                                                    x=0.5, y=0.5, showarrow=FALSE, 
                                                    font=list(color="#94a3b8", size=14, family="Vazirmatn"))) %>% 
                  plotly::config(displayModeBar=FALSE))
