@@ -90,11 +90,10 @@ download_historical_data <- function(station_id, start_date, end_date) {
   
   df_all <- do.call(rbind, dfs)
   
-  # اصلاح باگ ۱: اولویت با داده اخیر در حذف تکراری‌ها
+  # اولویت با داده اخیر در حذف تکراری‌ها
   df_all <- df_all[order(df_all$timestamp, decreasing = TRUE), ]
   df_all <- df_all[!duplicated(df_all$timestamp), ]
   df_all <- df_all[order(df_all$timestamp), ]
-  
   df_all <- df_all[!is.na(df_all$temperature), ]
   
   return(df_all)
@@ -107,8 +106,12 @@ add_engineered_features <- function(df) {
   if (nrow(df) == 0) return(df)
   
   df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
+  df$temperature <- as.numeric(df$temperature)
+  if ("humidity" %in% names(df))       df$humidity       <- as.numeric(df$humidity)
+  if ("pressure" %in% names(df))        df$pressure        <- as.numeric(df$pressure)
+  if ("wind_speed" %in% names(df))      df$wind_speed      <- as.numeric(df$wind_speed)
+  if ("precipitation" %in% names(df))  df$precipitation   <- as.numeric(df$precipitation)
   
-  # اصلاح باگ ۲: ساخت سری زمانی کامل برای صحت لگ‌ها
   min_t <- min(df$timestamp, na.rm = TRUE)
   max_t <- max(df$timestamp, na.rm = TRUE)
   full_time <- seq(min_t, max_t, by = "hour")
@@ -120,6 +123,14 @@ add_engineered_features <- function(df) {
     df$temperature <- zoo::na.approx(df$temperature, na.rm = FALSE)
     df$temperature <- zoo::na.locf(df$temperature, na.rm = FALSE)
     df$temperature <- zoo::na.locf(df$temperature, fromLast = TRUE, na.rm = FALSE)
+  }
+  
+  for (col in c("humidity", "pressure", "wind_speed", "precipitation")) {
+    if (col %in% names(df) && any(is.na(df[[col]]))) {
+      df[[col]] <- zoo::na.approx(df[[col]], na.rm = FALSE)
+      df[[col]] <- zoo::na.locf(df[[col]], na.rm = FALSE)
+      df[[col]] <- zoo::na.locf(df[[col]], fromLast = TRUE, na.rm = FALSE)
+    }
   }
   
   df$hour <- lubridate::hour(df$timestamp)
@@ -155,6 +166,32 @@ add_engineered_features <- function(df) {
 }
 
 # --------------------------------------------------
+# افزودن ستون‌های روزانه temp_max و temp_min
+# --------------------------------------------------
+add_daily_min_max <- function(df) {
+  if (nrow(df) == 0) return(df)
+  
+  df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
+  df$date_only <- as.Date(df$timestamp, tz = "Asia/Tehran")
+  
+  daily_summary <- df %>%
+    dplyr::group_by(date_only) %>%
+    dplyr::summarise(
+      temp_max = if (all(is.na(temperature))) NA_real_ else max(temperature, na.rm = TRUE),
+      temp_min = if (all(is.na(temperature))) NA_real_ else min(temperature, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  df$temp_max <- NULL
+  df$temp_min <- NULL
+  
+  df <- dplyr::left_join(df, daily_summary, by = "date_only")
+  df$date_only <- NULL
+  
+  return(df)
+}
+
+# --------------------------------------------------
 # دانلود از ابتدا و ذخیره ۵ شهر با ویژگی‌های جدید
 # --------------------------------------------------
 download_all_weather_data <- function(full_start_date = "2021-01-01", out_dir = "data") {
@@ -175,8 +212,9 @@ download_all_weather_data <- function(full_start_date = "2021-01-01", out_dir = 
     
     if (!is.null(new_df) && nrow(new_df) > 0) {
       new_df <- add_engineered_features(new_df)
+      new_df <- add_daily_min_max(new_df) # 🔴 اضافه شدن ستون‌های مین و مکس
       
-      # اصلاح باگ ۳: حفظ ساعت در ذخیره CSV
+      # حفظ ساعت در ذخیره CSV
       new_df$timestamp <- format(new_df$timestamp, "%Y-%m-%d %H:%M:%S")
       
       file_name <- file.path(out_dir, paste0("weather_", city, ".csv"))
@@ -224,7 +262,7 @@ add_calendar_features <- function(df) {
 # ── ساخت ماتریس ویژگی برای مدل‌های ML (روزانه) ──────────────────────────────
 build_feature_matrix <- function(df, target = "temperature", lag_days = c(1, 2, 3, 7, 14)) {
   df <- df %>% dplyr::arrange(date) %>% add_calendar_features()
-  
+  df$t <- seq_len(nrow(df)) 
   df[[paste0("smooth_", target)]] <- zoo::rollmean(df[[target]], k = 3, fill = NA, align = "right")
   
   for (lag in lag_days) {
@@ -263,7 +301,6 @@ build_hourly_feature_matrix <- function(df, target = "temperature", lag_hours = 
     df$rain_prob_rule <- 0
   }
   
-  # اصلاح باگ ۴: اضافه شدن ستون‌های smooth که در HOURLY_FEAT_COLS وجود داشتند
   df$smooth_temperature <- zoo::rollmean(df$temperature, k = 3, fill = NA, align = "right")
   if ("humidity" %in% names(df)) df$smooth_humidity <- zoo::rollmean(df$humidity, k = 3, fill = NA, align = "right")
   if ("wind_speed" %in% names(df)) df$smooth_wind_speed <- zoo::rollmean(df$wind_speed, k = 3, fill = NA, align = "right")
@@ -351,15 +388,45 @@ advanced_clean_data <- function(df) {
     return(x)
   }
   
-  df$temperature   <- remove_iqr_outliers(df$temperature, df$month)
-  df$humidity      <- remove_iqr_outliers(df$humidity, df$month)
-  df$wind_speed    <- remove_iqr_outliers(df$wind_speed, df$month)
-  df$precipitation <- remove_iqr_outliers(df$precipitation, df$month)
+  if ("temperature" %in% names(df)) {
+    df$temperature <- remove_iqr_outliers(df$temperature, df$month)
+    df$temperature <- zoo::na.approx(df$temperature, na.rm = FALSE)
+  }
   
-  df$temperature   <- zoo::na.approx(df$temperature, na.rm = FALSE)
-  df$humidity      <- zoo::na.approx(df$humidity, na.rm = FALSE)
-  df$precipitation[is.na(df$precipitation)] <- 0
-  df$wind_speed <- zoo::na.fill(df$wind_speed, "extend")
+  if ("humidity" %in% names(df)) {
+    df$humidity <- remove_iqr_outliers(df$humidity, df$month)
+    df$humidity <- zoo::na.approx(df$humidity, na.rm = FALSE)
+  }
+  
+  if ("wind_speed" %in% names(df)) {
+    df$wind_speed <- remove_iqr_outliers(df$wind_speed, df$month)
+    df$wind_speed <- zoo::na.fill(df$wind_speed, "extend")
+  }
+  
+  if ("precipitation" %in% names(df)) {
+    df$precipitation <- remove_iqr_outliers(df$precipitation, df$month)
+    df$precipitation[is.na(df$precipitation)] <- 0
+  }
+  
+  if ("temp_max" %in% names(df)) {
+    df$temp_max[!is.finite(df$temp_max)] <- NA
+    df$temp_max <- remove_iqr_outliers(df$temp_max, df$month)
+    df$temp_max <- zoo::na.approx(df$temp_max, na.rm = FALSE)
+    df$temp_max <- zoo::na.locf(df$temp_max, na.rm = FALSE)
+    df$temp_max <- zoo::na.locf(df$temp_max, fromLast = TRUE, na.rm = FALSE)
+  }
+  
+  if ("temp_min" %in% names(df)) {
+    df$temp_min[!is.finite(df$temp_min)] <- NA
+    df$temp_min <- remove_iqr_outliers(df$temp_min, df$month)
+    df$temp_min <- zoo::na.approx(df$temp_min, na.rm = FALSE)
+    df$temp_min <- zoo::na.locf(df$temp_min, na.rm = FALSE)
+    df$temp_min <- zoo::na.locf(df$temp_min, fromLast = TRUE, na.rm = FALSE)
+  }
+  
+  if (all(c("temp_max", "temp_min") %in% names(df))) {
+    df$temp_min <- pmin(df$temp_min, df$temp_max)
+  }
   
   df$month <- NULL
   return(df)

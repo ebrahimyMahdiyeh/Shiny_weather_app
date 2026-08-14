@@ -16,8 +16,6 @@ add_engineered_features <- function(df) {
   
   df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
   df$temperature <- as.numeric(df$temperature)
-  df$humidity <- as.numeric(df$humidity)
-  df$pressure <- as.numeric(df$pressure)
   
   # 1. Create a complete hourly grid to ensure lags are time-based, not row-based
   min_t <- min(df$timestamp, na.rm = TRUE)
@@ -29,7 +27,7 @@ add_engineered_features <- function(df) {
   df <- merge(full_df, df, by = "timestamp", all.x = TRUE)
   df <- df[order(df$timestamp), ]
   
-  # 2. Interpolate missing temperature values for accurate rolling/lags
+  # 2. Interpolate missing values
   if (any(is.na(df$temperature))) {
     df$temperature <- zoo::na.approx(df$temperature, na.rm = FALSE)
     df$temperature <- zoo::na.locf(df$temperature, na.rm = FALSE)
@@ -54,7 +52,7 @@ add_engineered_features <- function(df) {
   # Smooth temperature
   df$smooth_temperature <- zoo::rollmean(df$temperature, k = 3, fill = NA, align = "right")
   
-  # Time-accurate hourly lags (Since grid is complete, 1 row = 1 hour)
+  # Time-accurate hourly lags
   df$lag_1h  <- dplyr::lag(df$temperature, 1)
   df$lag_2h  <- dplyr::lag(df$temperature, 2)
   df$lag_3h  <- dplyr::lag(df$temperature, 3)
@@ -70,6 +68,32 @@ add_engineered_features <- function(df) {
   if ("station_id" %in% names(df)) {
     df$station_id <- df$station_id[1]
   }
+  
+  return(df)
+}
+
+# --------------------------------------------------
+# Add daily temp_max / temp_min (AFTER features)
+# --------------------------------------------------
+add_daily_min_max <- function(df) {
+  if (nrow(df) == 0) return(df)
+  
+  df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
+  df$date_only <- as.Date(df$timestamp, tz = "Asia/Tehran")
+  
+  daily_summary <- df %>%
+    dplyr::group_by(date_only) %>%
+    dplyr::summarise(
+      temp_max = if (all(is.na(temperature))) NA_real_ else max(temperature, na.rm = TRUE),
+      temp_min = if (all(is.na(temperature))) NA_real_ else min(temperature, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  df$temp_max <- NULL
+  df$temp_min <- NULL
+  
+  df <- dplyr::left_join(df, daily_summary, by = "date_only")
+  df$date_only <- NULL
   
   return(df)
 }
@@ -183,12 +207,9 @@ download_historical_data <- function(station_id, start_date, end_date) {
   if (length(dfs) == 0) stop(paste("No data retrieved for", station_id))
   
   df_all <- do.call(rbind, dfs)
-  
-  # FIX BUG 1: Prioritize Forecast API by sorting descending, then removing duplicates
   df_all <- df_all[order(df_all$timestamp, decreasing = TRUE), ]
   df_all <- df_all[!duplicated(df_all$timestamp), ]
   df_all <- df_all[order(df_all$timestamp), ]
-  
   df_all <- df_all[!is.na(df_all$temperature), ]
   
   return(df_all)
@@ -220,6 +241,7 @@ download_all_weather_data <- function(full_start_date = "2021-01-01", out_dir = 
     
     if (!is.null(new_df) && nrow(new_df) > 0) {
       new_df <- add_engineered_features(new_df)
+      new_df <- add_daily_min_max(new_df) # Added daily min/max
       
       # FIX MIDNIGHT BUG: Format as string to prevent dropping 00:00:00 in CSV
       new_df$timestamp <- format(new_df$timestamp, "%Y-%m-%d %H:%M:%S")

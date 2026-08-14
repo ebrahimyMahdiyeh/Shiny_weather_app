@@ -144,8 +144,6 @@ list_weather_csvs <- function(data_dir = DATA_DIR) {
   parsed
 }
 
-# ── یکپارچه‌سازی ستون‌ها (Daily) ────────────────────────────────────────────────
-# اصلاح مهم: حفظ ستون station_id هنگام تجمیع روزانه
 harmonize_columns <- function(df) {
   if ("timestamp" %in% names(df) && !"date" %in% names(df)) {
     if (is.character(df$timestamp)) {
@@ -170,6 +168,9 @@ harmonize_columns <- function(df) {
       dplyr::filter(!is.na(date)) %>%
       dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) %>%
       dplyr::summarise(
+        # 🔴 اصلاح ترتیب: اول مکس و مین از داده‌های خام محاسبه می‌شوند، سپس میانگین بازنویسی می‌شود
+        temp_max      = ifelse(all(is.na(temperature)), NA, max(temperature, na.rm = TRUE)),
+        temp_min      = ifelse(all(is.na(temperature)), NA, min(temperature, na.rm = TRUE)),
         temperature   = mean(temperature, na.rm = TRUE),
         humidity      = mean(humidity, na.rm = TRUE),
         wind_speed    = mean(wind_speed, na.rm = TRUE),
@@ -230,6 +231,8 @@ generate_sample_data <- function() {
       date          = dates,
       station_id    = sid,
       temperature   = round(temp, 1),
+      temp_max      = round(temp + 5, 1),
+      temp_min      = round(temp - 5, 1),
       humidity      = round(pmax(10, pmin(100, 50 + 20 * cos(2 * pi * seq_len(n) / 365) + rnorm(n, 0, 5))), 1),
       wind_speed    = round(pmax(0, 10 + rnorm(n, 0, 4)), 1),
       precipitation = round(pmax(0, rgamma(n, 0.3, 0.3)), 1)

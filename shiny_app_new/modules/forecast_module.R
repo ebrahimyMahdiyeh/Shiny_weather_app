@@ -333,10 +333,10 @@ forecastUI <- function(id) {
                                         tags$span(class="fc-section-lbl", style="margin-bottom:0;", "۲۴ ساعت آینده —"),
                                         tags$span(style="font-size:14px;font-weight:800;color:#60a5fa;", textOutput(ns("active_model_lbl"), inline=TRUE))
                                ),
+                               uiOutput(ns("strip_model_selector")),
                                uiOutput(ns("hourly_strip")),
                                tags$div(style="margin-top:12px;", uiOutput(ns("dynamic_chart_ui")))
                       ),
-                      
                       uiOutput(ns("daily_forecast_section")),
                       uiOutput(ns("feat_imp_box"))
                )
@@ -409,9 +409,23 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     last_error     <- reactiveVal(NULL)
     daily_selected_model <- reactiveVal(NULL)
     feat_imp_selected_model <- reactiveVal(NULL) 
+    active_strip_model <- reactiveVal(NULL)  
     
     observeEvent(input$daily_model_click, { daily_selected_model(input$daily_model_click) })
     observeEvent(input$feat_imp_model_click, { feat_imp_selected_model(input$feat_imp_model_click) })
+    
+    observeEvent(hourly_ml_pred(), {
+      mlp <- hourly_ml_pred()
+      if (!is.null(mlp) && length(mlp$preds_list) > 0) {
+        active_strip_model(names(mlp$preds_list)[1])
+      } else {
+        active_strip_model(NULL)
+      }
+    })
+    
+    observeEvent(input$strip_model_click, {
+      active_strip_model(input$strip_model_click)
+    })
     
     run_hourly_pred <- function() {
       sid <- input$station
@@ -427,7 +441,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         return()
       }
       
-      # ── مدیریت مدل انسمبل ──
       run_ensemble <- "ensemble" %in% user_selected_models
       ENSEMBLE_BASE_MODELS <- c("arima", "ets", "xgboost", "lightgbm")
       
@@ -502,7 +515,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         if (gap_hours > 100) { gap_hours <- 0; last_ts <- now_hour }
         
         horizon_24h <- 24 + gap_hours
-        horizon_7d  <- 168 + gap_hours
         
         start_time <- Sys.time()
         use_mv <- isTRUE(input$use_multivariate)
@@ -522,7 +534,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             actual_vals <- actual_vals[1:len]; pred_vals <- pred_vals[1:len]
             valid <- !is.na(actual_vals) & !is.na(pred_vals)
             
-            # ── [FIX] فیلتر کردن مقادیر نامعتبر (NaN, Inf) که باعث خرابی ETS می‌شود ──
             if(sum(valid) > 2) {
               a <- as.numeric(actual_vals[valid]); p <- as.numeric(pred_vals[valid])
               finite_idx <- is.finite(a) & is.finite(p)
@@ -542,69 +553,87 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
           }
         }
         
-        # ── پیش‌بینی ۲۴ ساعت و ۷ روز آینده ──
         all_preds_24h <- list()
-        all_preds_7d  <- list()
+        all_preds_7d  <- list() 
         all_feat_imp  <- list() 
         
+        # ── آماده‌سازی مستقیم داده روزانه برای مکس و مین ──
+        daily_df <- NULL
+        if (target == "temperature") {
+          raw_daily <- weather_data()[[sid]]
+          if (!is.null(raw_daily) && nrow(raw_daily) > 30 && all(c("temp_max", "temp_min") %in% names(raw_daily))) {
+            daily_df <- data.frame(
+              date = as.Date(raw_daily$date),
+              temp_max = as.numeric(raw_daily$temp_max),
+              temp_min = as.numeric(raw_daily$temp_min)
+            )
+            daily_df$temp_max[!is.finite(daily_df$temp_max)] <- NA
+            daily_df$temp_min[!is.finite(daily_df$temp_min)] <- NA
+            daily_df$temp_max <- zoo::na.locf(daily_df$temp_max, na.rm = FALSE)
+            daily_df$temp_max <- zoo::na.locf(daily_df$temp_max, fromLast = TRUE, na.rm = FALSE)
+            daily_df$temp_min <- zoo::na.locf(daily_df$temp_min, na.rm = FALSE)
+            daily_df$temp_min <- zoo::na.locf(daily_df$temp_min, fromLast = TRUE, na.rm = FALSE)
+            daily_df <- daily_df[complete.cases(daily_df), ]
+            daily_df$temp_min <- pmin(daily_df$temp_min, daily_df$temp_max)
+          }
+        }
+        
         for (mn in models_to_run) {
-          res_final <- NULL
-          is_7d_success <- FALSE
           
-          if (target == "temperature") {
-            res_7d <- tryCatch(run_hourly_model(mn, h_data_combined, horizon_h = horizon_7d, target = target, use_multivariate = use_mv), error = function(e) NULL)
-            if (!is.null(res_7d) && !is.null(res_7d$predictions) && length(res_7d$predictions) >= horizon_7d) {
-              res_final <- res_7d
-              is_7d_success <- TRUE
-            }
-          }
-          
-          if (is.null(res_final)) {
-            res_final <- tryCatch(run_hourly_model(mn, h_data_combined, horizon_h = horizon_24h, target = target, use_multivariate = use_mv), error = function(e) NULL)
-          }
+          # ── ۱. پیش‌بینی ۲۴ ساعت آینده (مدل ساعتی) ──
+          res_final <- tryCatch(run_hourly_model(mn, h_data_combined, horizon_h = horizon_24h, target = target, use_multivariate = use_mv), error = function(e) NULL)
           
           if (!is.null(res_final) && !is.null(res_final$predictions) && length(res_final$predictions) >= horizon_24h) {
             idx_24_start <- gap_hours + 1
             idx_24_end <- gap_hours + 24
             
-            # ── [FIX] پاک‌سازی مقادیر نامعتبر (NaN, Inf) در پیش‌بینی‌ها ──
             preds_24 <- sanitize_vec(res_final$predictions[idx_24_start:idx_24_end])
+            lower_24 <- if (!is.null(res_final$lower) && length(res_final$lower) >= idx_24_end) sanitize_vec(res_final$lower[idx_24_start:idx_24_end]) else preds_24 - 1.5
+            upper_24 <- if (!is.null(res_final$upper) && length(res_final$upper) >= idx_24_end) sanitize_vec(res_final$upper[idx_24_start:idx_24_end]) else preds_24 + 1.5
             
-            lower_24 <- if (!is.null(res_final$lower) && length(res_final$lower) >= idx_24_end) {
-              sanitize_vec(res_final$lower[idx_24_start:idx_24_end])
-            } else {
-              preds_24 - 1.5
-            }
-            upper_24 <- if (!is.null(res_final$upper) && length(res_final$upper) >= idx_24_end) {
-              sanitize_vec(res_final$upper[idx_24_start:idx_24_end])
-            } else {
-              preds_24 + 1.5
-            }
-            
-            # اطمینان از صحت بازه‌های اطمینان
             lower_24 <- pmin(lower_24, preds_24)
             upper_24 <- pmax(upper_24, preds_24)
             
             all_preds_24h[[mn]] <- list(preds = preds_24, lower = lower_24, upper = upper_24, method = MODEL_META[[mn]]$label, color = MODEL_META[[mn]]$color)
+            if (!is.null(res_final$feat_imp)) all_feat_imp[[mn]] <- res_final$feat_imp
+          }
+          
+          # ── ۲. پیش‌بینی ۷ روز آینده (مستقیماً روی مکس و مین) ──
+          # ── ۲. پیش‌بینی ۷ روز آینده (Direct Multi-Horizon روی مکس و مین) ──
+          if (!is.null(daily_df) && nrow(daily_df) > 30) {
             
-            if (is_7d_success) {
-              preds_168 <- sanitize_vec(res_7d$predictions[idx_24_start:(gap_hours + 168)])
-              
-              future_ts_7d <- seq(from = now_hour + 3600, by = 3600, length.out = 168)
-              df_agg <- data.frame(date = as.Date(future_ts_7d), val = preds_168)
-              daily_agg <- df_agg %>%
-                dplyr::group_by(date) %>%
-                dplyr::summarise(max_val = max(val, na.rm=TRUE), min_val = min(val, na.rm=TRUE), .groups="drop") %>%
-                head(7)
-              
-              if (any(!is.finite(daily_agg$max_val))) daily_agg$max_val <- sanitize_vec(daily_agg$max_val)
-              if (any(!is.finite(daily_agg$min_val))) daily_agg$min_val <- sanitize_vec(daily_agg$min_val)
-              
-              all_preds_7d[[mn]] <- daily_agg
-            }
+            df_max <- daily_df[, c("date", "temp_max")]
+            df_min <- daily_df[, c("date", "temp_min")]
             
-            if (!is.null(res_final$feat_imp)) {
-              all_feat_imp[[mn]] <- res_final$feat_imp
+            # استفاده از موتور Direct برای مکس
+            res_7d_max <- tryCatch(forecast_direct_ml(df_max, 7, target = "temp_max", model_type = mn), error = function(e) NULL)
+            # استفاده از موتور Direct برای مین
+            res_7d_min <- tryCatch(forecast_direct_ml(df_min, 7, target = "temp_min", model_type = mn), error = function(e) NULL)
+            
+            if (!is.null(res_7d_max) && !is.null(res_7d_min) && 
+                !is.null(res_7d_max$predictions) && length(res_7d_max$predictions) >= 7 &&
+                !is.null(res_7d_min$predictions) && length(res_7d_min$predictions) >= 7) {
+              
+              preds_max <- sanitize_vec(res_7d_max$predictions[1:7])
+              preds_min <- sanitize_vec(res_7d_min$predictions[1:7])
+              
+              # محدودسازی فیزیکی و منطق مین/مکس
+              hist_min <- min(daily_df$temp_min, na.rm = TRUE) - 5
+              hist_max <- max(daily_df$temp_max, na.rm = TRUE) + 5
+              preds_max <- pmin(pmax(preds_max, hist_min), hist_max)
+              preds_min <- pmin(pmax(preds_min, hist_min), hist_max)
+              preds_max <- pmax(preds_max, preds_min + 0.5) 
+              
+              last_date <- max(daily_df$date)
+              future_dates <- seq.Date(last_date + 1, by = "day", length.out = 7)
+              
+              all_preds_7d[[mn]] <- list(
+                dates = future_dates,
+                preds_max = preds_max,
+                preds_min = preds_min,
+                method = MODEL_META[[mn]]$label,
+                color = MODEL_META[[mn]]$color
+              )
             }
           }
         }
@@ -641,14 +670,16 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             
             valid_models_7d <- intersect(valid_models, names(all_preds_7d))
             if (length(valid_models_7d) >= 2) {
-              n_days <- nrow(all_preds_7d[[ valid_models_7d[1] ]])
-              ens_max <- rowSums(sapply(valid_models_7d, function(mn) sanitize_vec(all_preds_7d[[mn]]$max_val, n_days) * weights[mn]))
-              ens_min <- rowSums(sapply(valid_models_7d, function(mn) sanitize_vec(all_preds_7d[[mn]]$min_val, n_days) * weights[mn]))
+              ens_max <- rowSums(sapply(valid_models_7d, function(mn) sanitize_vec(all_preds_7d[[mn]]$preds_max) * weights[mn]))
+              ens_min <- rowSums(sapply(valid_models_7d, function(mn) sanitize_vec(all_preds_7d[[mn]]$preds_min) * weights[mn]))
+              ens_max <- pmax(ens_max, ens_min + 0.5)
               
-              all_preds_7d[["ensemble"]] <- tibble::tibble(
-                date = all_preds_7d[[ valid_models_7d[1] ]]$date,
-                max_val = ens_max,
-                min_val = ens_min
+              all_preds_7d[["ensemble"]] <- list(
+                dates = all_preds_7d[[ valid_models_7d[1] ]]$dates,
+                preds_max = ens_max,
+                preds_min = ens_min,
+                method = "AutoML Ensemble",
+                color = MODEL_META$ensemble$color
               )
             }
             
@@ -717,17 +748,18 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             
             for (mn in names(all_preds_7d)) {
               ml_d <- all_preds_7d[[mn]]
-              merged <- dplyr::inner_join(ml_d, om_daily_agg, by="date", suffix=c("_ml", "_om"))
+              ml_df <- data.frame(date = ml_d$dates, max_val_ml = ml_d$preds_max, min_val_ml = ml_d$preds_min)
+              merged <- dplyr::inner_join(ml_df, om_daily_agg, by="date")
               if (nrow(merged) > 1) {
-                diff_max <- abs(as.numeric(merged$max_val_ml) - as.numeric(merged$max_val_om))
-                diff_min <- abs(as.numeric(merged$min_val_ml) - as.numeric(merged$min_val_om))
+                diff_max <- abs(as.numeric(merged$max_val_ml) - as.numeric(merged$max_val))
+                diff_min <- abs(as.numeric(merged$min_val_ml) - as.numeric(merged$min_val))
                 all_diffs <- c(diff_max, diff_min)
                 
                 daily_comp_metrics[[mn]] <- list(
                   avg_diff = round(mean(all_diffs, na.rm=TRUE), 1), 
                   max_diff = round(max(all_diffs, na.rm=TRUE), 1), 
                   min_diff = round(min(all_diffs, na.rm=TRUE), 1), 
-                  trend_sim = round(tryCatch(cor(merged$max_val_ml, merged$max_val_om, use="complete.obs"), error=function(e) 0) * 100, 0)
+                  trend_sim = round(tryCatch(cor(merged$max_val_ml, merged$max_val, use="complete.obs"), error=function(e) 0) * 100, 0)
                 )
               }
             }
@@ -768,7 +800,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         hourly_ml_pred(NULL)
       })
     }
-    
     # ── NOW CARD (Premium UI) ──
     output$now_card <- renderUI({
       ld <- live_data(); sid <- input$station %||% names(STATIONS)[1]
@@ -778,6 +809,9 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       
       cur <- ld$current; wi <- weather_icon(cur$w_code, cur$is_day)
       d0  <- if(nrow(ld$daily)>0) ld$daily[1,] else NULL
+      
+      p_prob <- cur$precip_prob
+      if (is.null(p_prob) || is.na(p_prob)) p_prob <- 0
       
       tags$div(class="weather-hero",
                tags$div(class="hero-main",
@@ -806,7 +840,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
                         tags$div(class="today-summary",
                                  tags$div(class="today-item", tags$i(class="fa fa-arrow-up", style="color:#ef4444"), if(!is.null(d0)) paste0(round(d0$temp_max,0),"°") else "—"),
                                  tags$div(class="today-item", tags$i(class="fa fa-arrow-down", style="color:#3b82f6"), if(!is.null(d0)) paste0(round(d0$temp_min,0),"°") else "—"),
-                                 tags$div(class="today-item", tags$i(class="fa fa-droplet", style="color:#60a5fa"), paste0(round(cur$precip_prob%||%0,0), "%"))
+                                 tags$div(class="today-item", tags$i(class="fa fa-droplet", style="color:#60a5fa"), paste0(round(p_prob,0), "%"))
                         ),
                         tags$div(class="metric-grid",
                                  tags$div(class="metric-item", tags$div(class="m-icon-lbl", tags$i(class="fa fa-droplet m-icon"), tags$span(class="m-lbl", "رطوبت")), tags$div(class="m-val", paste0(round(cur$humidity,0), " %"))),
@@ -836,23 +870,79 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       p
     })
     
+    output$strip_model_selector <- renderUI({
+      mlp <- hourly_ml_pred()
+      req(mlp, mlp$preds_list)
+      models <- names(mlp$preds_list)
+      
+      current_sel <- active_strip_model()
+      if (is.null(current_sel) || !current_sel %in% models) {
+        active_strip_model(models[1])
+        current_sel <- models[1]
+      }
+      
+      pills <- lapply(models, function(mn) {
+        is_active <- mn == current_sel
+        cls <- if(is_active) "daily-pill active" else "daily-pill"
+        color <- MODEL_META[[mn]]$color
+        
+        tags$div(
+          class = cls,
+          onclick = paste0("Shiny.setInputValue('", ns("strip_model_click"), "', '", mn, "', {priority:'event'})"),
+          tags$div(class="pill-dot", style=paste0("background:", color, ";")),
+          MODEL_META[[mn]]$label
+        )
+      })
+      
+      tags$div(style = "display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; overflow-x: auto; padding-bottom: 4px;", pills)
+    })
+    
     output$hourly_strip <- renderUI({
+      mlp <- hourly_ml_pred()
       ld <- live_data()
-      if (is.null(ld) || is.null(ld$hourly)) return(tags$div(style="color:var(--text3);text-align:center;padding:10px;font-size:14px;", "داده‌ای دریافت نشده"))
-      now <- if (!is.null(ld$current) && !is.null(ld$current$time)) ld$current$time else Sys.time()
-      h24 <- ld$hourly %>% dplyr::filter(time >= now - 3600, time <= now + 3600*24) %>% tail(24)
-      if (nrow(h24) == 0) return(NULL)
-      cards <- purrr::map(seq_len(nrow(h24)), function(i) {
-        r <- h24[i,]; wi <- weather_icon(r$w_code, r$is_day)
-        lbl <- if(i==1) "الان" else format(r$time,"%H:%M")
-        pr  <- if(!is.na(r$precip_prob)&&r$precip_prob>10) paste0(round(r$precip_prob,0),"%") else ""
-        tags$div(class=if(i==1)"hour-card now-hour" else "hour-card", 
+      
+      if (is.null(mlp) || length(mlp$preds_list) == 0) {
+        return(tags$div(style="color:var(--text3);text-align:center;padding:10px;font-size:14px;", "برای مشاهده پیش‌بینی ۲۴ ساعته، روی «اجرای مدل» کلیک کنید"))
+      }
+      
+      sel_mn <- active_strip_model()
+      if (is.null(sel_mn) || !sel_mn %in% names(mlp$preds_list)) {
+        sel_mn <- names(mlp$preds_list)[1]
+      }
+      
+      m_data <- mlp$preds_list[[sel_mn]]
+      ts <- mlp$timestamps
+      preds <- m_data$preds
+      
+      om_h <- NULL
+      if (!is.null(ld) && !is.null(ld$hourly)) {
+        om_h <- ld$hourly %>% dplyr::filter(time %in% ts)
+      }
+      
+      cards <- purrr::map(seq_len(24), function(i) {
+        t <- ts[i]
+        p <- preds[i]
+        
+        w_code <- NA
+        is_day <- 1
+        if (!is.null(om_h)) {
+          row <- om_h[om_h$time == t, ]
+          if (nrow(row) > 0) {
+            w_code <- row$w_code[1]
+            is_day <- row$is_day[1]
+          }
+        }
+        wi <- weather_icon(w_code, is_day)
+        
+        lbl <- if(i==1) "الان" else format(t,"%H:%M")
+        
+        tags$div(class="hour-card", 
                  tags$div(class="hour-time",lbl), 
                  tags$div(class="hour-icon",wi$icon), 
-                 tags$div(class="hour-temp",paste0(round(r$temp,0),"°")), 
-                 if(nchar(pr)>0) tags$div(class="hour-prob", tags$i(class="fa fa-droplet",style="font-size:10px;margin-left:2px;"),pr))
+                 tags$div(class="hour-temp", paste0(round(p, 0), "°")), 
+                 tags$div(class="hour-prob", style="font-size:10px; color:var(--text3);", m_data$method))
       })
-      tags$div(class="hourly-strip",cards)
+      tags$div(class="hourly-strip", cards)
     })
     
     output$dynamic_chart_ui <- renderUI({
@@ -875,6 +965,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       x_max <- now + 3600*24
       p <- plotly::plot_ly()
       
+      hist_h <- NULL
       if (!is.null(ld)) {
         hist_h <- ld$hourly %>% dplyr::filter(time >= x_min, time <= now) %>%
           dplyr::mutate(y_val = switch(var, temperature=temp, humidity=humidity, wind_speed=wind_speed, precipitation=precip, temp))
@@ -897,38 +988,45 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       
       has_pred <- !is.null(mlp) && mlp$target == var && length(mlp$preds_list) > 0
       if (has_pred) {
-        if (length(mlp$preds_list) == 1) {
-          m_name <- names(mlp$preds_list)[1]
-          m_data <- mlp$preds_list[[m_name]]
-          
-          # ── [FIX] جلوگیری از شکست نمودار در صورت نبود lower/upper معتبر ──
-          m_lower <- if (!is.null(m_data$lower) && length(m_data$lower) == 24 && all(is.finite(m_data$lower))) m_data$lower else m_data$preds - 1.5
-          m_upper <- if (!is.null(m_data$upper) && length(m_data$upper) == 24 && all(is.finite(m_data$upper))) m_data$upper else m_data$preds + 1.5
-          
-          p <- p %>%
-            plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_lower,
-                              line=list(color="transparent"), showlegend=FALSE, hoverinfo="skip") %>%
-            plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_upper,
-                              fill="tonexty", fillcolor=paste0(substr(m_data$color,1,7),"22"),
-                              line=list(color="transparent"), name="بازه ۹۵٪",
-                              hovertemplate=paste0("حد بالا: %{y:.1f}",unit,"<extra></extra>"))
+        active_mn <- active_strip_model()
+        if (is.null(active_mn) || !active_mn %in% names(mlp$preds_list)) {
+          active_mn <- names(mlp$preds_list)[1]
         }
+        
+        m_data_active <- mlp$preds_list[[active_mn]]
+        m_lower <- if (!is.null(m_data_active$lower) && length(m_data_active$lower) == 24 && all(is.finite(m_data_active$lower))) m_data_active$lower else m_data_active$preds - 1.5
+        m_upper <- if (!is.null(m_data_active$upper) && length(m_data_active$upper) == 24 && all(is.finite(m_data_active$upper))) m_data_active$upper else m_data_active$preds + 1.5
+        
+        p <- p %>%
+          plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_lower,
+                            line=list(color="transparent"), showlegend=FALSE, hoverinfo="skip") %>%
+          plotly::add_trace(type="scatter", mode="lines", x=mlp$timestamps, y=m_upper,
+                            fill="tonexty", fillcolor=paste0(substr(m_data_active$color,1,7),"22"),
+                            line=list(color="transparent"), name="بازه ۹۵٪",
+                            hovertemplate=paste0("حد بالا: %{y:.1f}",unit,"<extra></extra>"))
         
         for (m_name in names(mlp$preds_list)) {
           m_data <- mlp$preds_list[[m_name]]
+          is_active <- (m_name == active_mn)
+          
+          line_width <- if(is_active) 4 else 2
+          line_opacity <- if(is_active) 1.0 else 0.4
+          marker_size <- if(is_active) 7 else 5
+          
           p <- plotly::add_trace(p, type="scatter", mode="lines+markers",
                                  x=mlp$timestamps, y=m_data$preds,
                                  name=m_data$method,
-                                 line=list(color=m_data$color, width=3),
-                                 marker=list(color=m_data$color, size=6),
+                                 line=list(color=m_data$color, width=line_width),
+                                 marker=list(color=m_data$color, size=marker_size),
+                                 opacity=line_opacity,
                                  hovertemplate=paste0("%{x|%H:%M}<br>%{y:.1f}",unit,"<extra></extra>"))
         }
       }
       
       y_vals <- c(
-        if (!is.null(ld)) { ld$hourly %>% dplyr::filter(time >= x_min, time <= now) %>% { switch(var, temperature=.$temp, humidity=.$humidity, wind_speed=.$wind_speed, precipitation=.$precip, .$temp) } } else NA_real_,
+        if (!is.null(hist_h) && nrow(hist_h) > 0) hist_h$y_val else NA_real_,
         if (has_pred) do.call(c, lapply(mlp$preds_list, function(x) c(x$lower, x$upper, x$preds))) else NA_real_,
-        if (show_om) om_future[[om_var]] else NA_real_
+        if (show_om && nrow(om_future) > 0) om_future[[om_var]] else NA_real_
       )
       y_vals <- y_vals[is.finite(y_vals)]
       if (length(y_vals) > 0) { y_pad <- max(1, diff(range(y_vals) * 0.15)); y_range <- c(min(y_vals) - y_pad, max(y_vals) + y_pad) } else { y_range <- NULL }
@@ -951,7 +1049,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       p %>% plotly::config(displayModeBar=FALSE)
     })
     
-    # ── Evaluation Metrics Box ──
     output$train_res_ui <- renderUI({
       mlp <- hourly_ml_pred()
       if (is.null(mlp) || is.null(mlp$metrics) || length(mlp$metrics) == 0) return(NULL)
@@ -988,7 +1085,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       )
     })
     
-    # ── 7-Day Forecast Section ──
     output$daily_forecast_section <- renderUI({
       req(input$target_var)
       if (input$target_var != "temperature") return(NULL)
@@ -998,10 +1094,12 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
                  tags$div(
                    style="display:flex;align-items:center;gap:8px;margin-bottom:12px;",
                    tags$i(class="fa fa-calendar-week",style="color:#fbbf24;font-size:14px;"),
-                   tags$span(class="fc-section-lbl", style="margin-bottom:0;", "پیش‌بینی ۷ روز (مدل ML)")
+                   tags$span(class="fc-section-lbl", style="margin-bottom:0;", "پیش‌بینی ۷ روز (مدل روزانه)"),
+                   tags$span(style="font-size:12px; color:var(--text3); margin-right:auto;", "ناحیه سایه‌دار = افت دقت در آینده")
                  ),
                  uiOutput(ns("daily_model_selector")),
-                 uiOutput(ns("week_mini")),
+                 plotly::plotlyOutput(ns("weekly_cone_chart"), height = "300px"),
+                 tags$div(style="margin-top:16px;", uiOutput(ns("week_mini"))),
                  uiOutput(ns("daily_comp_metrics_ui"))
         )
       )
@@ -1009,7 +1107,8 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     
     output$daily_model_selector <- renderUI({
       mlp <- hourly_ml_pred()
-      req(mlp, mlp$daily_preds)
+      if (is.null(mlp) || is.null(mlp$daily_preds) || length(mlp$daily_preds) == 0) return(NULL)
+      
       models <- names(mlp$daily_preds)
       
       current_sel <- daily_selected_model()
@@ -1036,7 +1135,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     
     output$week_mini <- renderUI({
       mlp <- hourly_ml_pred()
-      req(mlp, mlp$daily_preds)
+      if (is.null(mlp) || is.null(mlp$daily_preds) || length(mlp$daily_preds) == 0) return(NULL)
       
       sel_mn <- daily_selected_model()
       if (is.null(sel_mn) || !sel_mn %in% names(mlp$daily_preds)) {
@@ -1046,12 +1145,12 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       
       ml_daily <- mlp$daily_preds[[sel_mn]]
       om_daily <- mlp$daily_om
-      compare_om <- isTRUE(input$compare_om) && !is.null(om_daily) && nrow(om_daily) > 0
+      compare_om <- isTRUE(input$compare_om) && !is.null(om_daily) && length(om_daily$date) > 0
       
-      if (nrow(ml_daily) == 0) return(NULL)
+      if (is.null(ml_daily$preds_max) || length(ml_daily$preds_max) == 0) return(NULL)
       
-      gmin <- min(ml_daily$min_val, na.rm=TRUE)
-      gmax <- max(ml_daily$max_val, na.rm=TRUE)
+      gmin <- min(ml_daily$preds_min, na.rm=TRUE)
+      gmax <- max(ml_daily$preds_max, na.rm=TRUE)
       if (compare_om) {
         gmin <- min(gmin, min(om_daily$min_val, na.rm=TRUE))
         gmax <- max(gmax, max(om_daily$max_val, na.rm=TRUE))
@@ -1061,24 +1160,23 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       fa_days <- c("یک‌شنبه","دوشنبه","سه‌شنبه","چهارشنبه","پنج‌شنبه","جمعه","شنبه")
       ld <- live_data()
       
-      cards <- purrr::map(seq_len(nrow(ml_daily)), function(i) {
-        r_ml <- ml_daily[i,]
+      cards <- purrr::map(seq_len(7), function(i) {
         r_om <- if (compare_om && i <= nrow(om_daily)) om_daily[i,] else NULL
         
         w_code <- if (!is.null(ld) && !is.null(ld$daily) && nrow(ld$daily) >= i) ld$daily$w_code[i] else NA
         wi <- weather_icon(w_code)
         
-        dow <- as.integer(format(r_ml$date,"%u")) %% 7
-        blft_ml <- round((as.numeric(r_ml$min_val)-gmin)/rng*100,0)
-        bwid_ml <- max(6,round((as.numeric(r_ml$max_val)-as.numeric(r_ml$min_val))/rng*100,0))
+        dow <- as.integer(format(ml_daily$dates[i],"%u")) %% 7
+        blft_ml <- round((as.numeric(ml_daily$preds_min[i])-gmin)/rng*100,0)
+        bwid_ml <- max(6,round((as.numeric(ml_daily$preds_max[i])-as.numeric(ml_daily$preds_min[i]))/rng*100,0))
         
         tags$div(class="wm-card",
                  tags$div(class="wm-name", fa_days[dow+1]),
-                 tags$div(class="wm-date", format(r_ml$date,"%d/%m")),
+                 tags$div(class="wm-date", format(ml_daily$dates[i],"%d/%m")),
                  tags$div(class="wm-icon", wi$icon),
-                 tags$div(class="wm-max", paste0(round(as.numeric(r_ml$max_val),0),"°")),
+                 tags$div(class="wm-max", paste0(round(as.numeric(ml_daily$preds_max[i]),0),"°")),
                  tags$div(class="wm-bar", tags$div(class="wm-bar-fill", style=paste0("left:",blft_ml,"%;width:",bwid_ml,"%;"))),
-                 tags$div(class="wm-min", paste0(round(as.numeric(r_ml$min_val),0),"°")),
+                 tags$div(class="wm-min", paste0(round(as.numeric(ml_daily$preds_min[i]),0),"°")),
                  
                  if (compare_om) {
                    blft_om <- round((as.numeric(r_om$min_val)-gmin)/rng*100,0)
@@ -1097,9 +1195,10 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     
     output$daily_comp_metrics_ui <- renderUI({
       mlp <- hourly_ml_pred()
-      req(mlp)
+      if (is.null(mlp) || is.null(mlp$daily_comp_metrics) || length(mlp$daily_comp_metrics) == 0) return(NULL)
+      
       compare_om <- isTRUE(input$compare_om)
-      if (!compare_om || is.null(mlp$daily_comp_metrics) || length(mlp$daily_comp_metrics) == 0) return(NULL)
+      if (!compare_om) return(NULL)
       
       sel_mn <- daily_selected_model()
       if (is.null(sel_mn) || !sel_mn %in% names(mlp$daily_comp_metrics)) {
@@ -1132,7 +1231,6 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       )
     })
     
-    # ── Feature Importance Section ──
     output$feat_imp_box <- renderUI({
       mlp <- hourly_ml_pred()
       req(mlp, mlp$feat_imp)
@@ -1200,13 +1298,93 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         plotly::config(displayModeBar = FALSE)
     })
     
-    # ── Forecast Explainer (XAI) ──
     output$error_box <- renderUI({
       err <- last_error(); if(is.null(err)) return(NULL)
       tags$div(style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);border-radius:8px;padding:10px 12px;margin-top:10px;", 
                tags$div(style="font-size:13px;font-weight:700;color:#f87171;margin-bottom:6px;display:flex;align-items:center;gap:5px;", 
                         tags$i(class="fa fa-triangle-exclamation"),"خطا — ", err$time), 
                tags$pre(style="background:rgba(0,0,0,.2);border-radius:4px;padding:8px;font-size:12px;color:#fca5a5;direction:ltr;text-align:left;white-space:pre-wrap;margin:0;", err$msg))
+    })
+    
+    # ── Weekly Cone Chart (بازسازی شده با ایمن‌سازی کامل + Open-Meteo) ──
+    output$weekly_cone_chart <- plotly::renderPlotly({
+      mlp <- hourly_ml_pred()
+      if (is.null(mlp) || is.null(mlp$daily_preds) || length(mlp$daily_preds) == 0) {
+        return(plotly::plot_ly(type="scatter", mode="lines") %>% 
+                 plotly::layout(annotations = list(text="مدلی برای پیش‌بینی ۷ روزه وجود ندارد", 
+                                                   x=0.5, y=0.5, showarrow=FALSE, 
+                                                   font=list(color="#94a3b8", size=14, family="Vazirmatn"))) %>% 
+                 plotly::config(displayModeBar=FALSE))
+      }
+      
+      sel_mn <- daily_selected_model()
+      if (is.null(sel_mn) || !sel_mn %in% names(mlp$daily_preds)) {
+        sel_mn <- names(mlp$daily_preds)[1]
+      }
+      
+      m_data <- mlp$daily_preds[[sel_mn]]
+      sid <- input$station %||% names(STATIONS)[1]
+      raw_daily <- weather_data()[[sid]]
+      ld <- live_data()
+      
+      p <- plotly::plot_ly()
+      
+      # ۱. رسم ۱۴ روز گذشته (واقعی) مستقیماً از داده
+      if (!is.null(raw_daily) && nrow(raw_daily) > 0 && all(c("temp_max", "temp_min") %in% names(raw_daily))) {
+        raw_daily$temp_max <- as.numeric(raw_daily$temp_max)
+        raw_daily$temp_min <- as.numeric(raw_daily$temp_min)
+        valid_hist <- raw_daily[!is.na(raw_daily$temp_max) & !is.na(raw_daily$temp_min), ]
+        hist_df <- tail(valid_hist, 14)
+        if (nrow(hist_df) > 0) {
+          p <- plotly::add_trace(p, type="scatter", mode="lines+markers", 
+                                 x=hist_df$date, y=hist_df$temp_max,
+                                 name="بیشینه (گذشته)", line=list(color="#ef4444", width=2, dash="dot"),
+                                 marker=list(color="#ef4444", size=6))
+          p <- plotly::add_trace(p, type="scatter", mode="lines+markers", 
+                                 x=hist_df$date, y=hist_df$temp_min,
+                                 name="کمینه (گذشته)", line=list(color="#3b82f6", width=2, dash="dot"),
+                                 marker=list(color="#3b82f6", size=6))
+        }
+      }
+      
+      # ۲. رسم پیش‌بینی بیشینه و کمینه (آینده) - مدل ML
+      p <- plotly::add_trace(p, type="scatter", mode="lines+markers", 
+                             x=m_data$dates, y=as.numeric(m_data$preds_max),
+                             name="بیشینه (مدل)", line=list(color="#22c55e", width=3),
+                             marker=list(color="#22c55e", size=8),
+                             hovertemplate="بیشینه مدل: %{y:.1f}°C<extra></extra>")
+      
+      p <- plotly::add_trace(p, type="scatter", mode="lines+markers", 
+                             x=m_data$dates, y=as.numeric(m_data$preds_min),
+                             name="کمینه (مدل)", line=list(color="#f59e0b", width=3, dash="dash"),
+                             marker=list(color="#f59e0b", size=8),
+                             hovertemplate="کمینه مدل: %{y:.1f}°C<extra></extra>")
+      
+      # ۳. رسم پیش‌بینی Open-Meteo
+      if (isTRUE(input$compare_om) && !is.null(ld) && !is.null(ld$daily) && nrow(ld$daily) > 0) {
+        om_future <- ld$daily[ld$daily$date %in% m_data$dates, ]
+        if (nrow(om_future) > 0) {
+          p <- plotly::add_trace(p, type="scatter", mode="lines+markers", 
+                                 x=om_future$date, y=as.numeric(om_future$temp_max),
+                                 name="بیشینه (Open-Meteo)", line=list(color="#14b8a6", width=2, dash="dot"),
+                                 marker=list(color="#14b8a6", size=7, symbol="x"),
+                                 hovertemplate="بیشینه OM: %{y:.1f}°C<extra></extra>")
+          p <- plotly::add_trace(p, type="scatter", mode="lines+markers", 
+                                 x=om_future$date, y=as.numeric(om_future$temp_min),
+                                 name="کمینه (Open-Meteo)", line=list(color="#8b5cf6", width=2, dash="dot"),
+                                 marker=list(color="#8b5cf6", size=7, symbol="x"),
+                                 hovertemplate="کمینه OM: %{y:.1f}°C<extra></extra>")
+        }
+      }
+      
+      p %>% plotly::layout(
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=list(family="Vazirmatn,Tahoma",color="#94a3b8",size=13),
+        xaxis=list(title="", gridcolor="rgba(99,143,232,.04)", tickfont=list(size=12,color="#94a3b8")),
+        yaxis=list(title="دما (°C)", gridcolor="rgba(99,143,232,.05)", tickfont=list(size=12,color="#94a3b8")),
+        legend=list(orientation="h",y=-0.2,x=.5,xanchor="center", font=list(size=12),bgcolor="rgba(0,0,0,0)"),
+        hovermode="x unified", margin=list(l=45,r=10,t=10,b=40)
+      ) %>% plotly::config(displayModeBar=FALSE)
     })
     
     observeEvent(input$run_model, {
