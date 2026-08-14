@@ -1,90 +1,102 @@
-#  WFS Dashboard — Iran Weather Forecast System
+# WFS Dashboard — Iran Weather Forecast System
 
 <p align="center">
   <img src="https://img.shields.io/badge/R-4.3+-blue.svg" alt="R Version">
   <img src="https://img.shields.io/badge/Shiny-Dashboard-success.svg" alt="Shiny">
-  <img src="https://img.shields.io/badge/Version-1.0-informational.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.0-informational.svg" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/Status-Research%20Project-orange.svg" alt="Status">
 </p>
 
-An R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statistical and machine-learning models, benchmarks them against each other on accuracy, speed, and stability, and exports the results as a shareable Excel/PDF report.
+An advanced R Shiny dashboard that forecasts weather for 5 Iranian cities using 11 statistical and machine-learning models. Version 2.0 introduces a **Direct Multi-Horizon** architecture, **Anomaly Targeting**, and **MOS Blending** to solve long-term forecast degradation in tree-based models.
 
 **Highlights**
-- **11 forecasting models** — ARIMA, SARIMA, ETS, TBATS (classical), Prophet (Bayesian), and Random Forest, XGBoost, LightGBM, CatBoost, SVM, Naive (ML/baseline) — plus a weighted AutoML ensemble on top
-- **Full benchmark suite**: leaderboard, speed test, rolling-window stability test, and a cross-station regional heatmap
-- **Live forecasting** for 5 cities — current conditions + 7-day outlook, cross-checked against the Open-Meteo API in real time
-- **One-click report export** to Excel or PDF
-- **Dark-themed, RTL Persian interface** built with R Shiny
+- **11 forecasting models + AutoML Ensemble** — ARIMA, SARIMA, ETS, TBATS, Prophet, Random Forest, XGBoost, LightGBM, CatBoost, SVM, Naïve, and a smart weighted Ensemble.
+- **Advanced 7-Day Forecasting**: Uses *Direct Multi-Horizon* (independent models per day) and *Anomaly Targeting* (predicting deviation from climatology) to prevent error accumulation and flat-lines in ML models.
+- **MOS Blending**: Option to blend ML predictions with Open-Meteo's NWP physics model for highly stable medium-range forecasts.
+- **Full benchmark suite**: Leaderboard, speed test, rolling-window stability, and a regional heatmap based on a 24-hour hourly backtest.
+- **Dark-themed, RTL Persian interface** built with R Shiny and Plotly.
 
 ---
 
-##  Screenshots
+## Screenshots
 
 <p align="center">
   <img src="images/overview.gif" alt="Overview page" width="800"><br>
   <sub>Overview of dashboard</sub>
 </p>
----
-
-##  Features
-
-###  Overview
-- Dataset stats at a glance: 5 stations, 10,040 daily records, 11 models
-- Historical temperature trend across all 5 stations in one chart, plus monthly averages per station
-- Per-station climate summary table (avg/min/max temperature, humidity, total precipitation, date coverage)
-- 5-step methodology pipeline, from data collection to evaluation
-- Model-family cheat sheet and climate variable distributions (violin plots)
-
-###  Weather Forecast
-- Pick a station, one or more models to compare, and a target variable — with an optional multivariate mode that feeds humidity/wind/pressure into ML models as covariates
-- Live conditions card: temperature, feels-like, pressure, wind, humidity, dew point, visibility, cloud cover, UV index, and a 24h trend sparkline
-- Hourly strip (past 24h + next 24h) with weather icons
-- Forecast chart with a 95% confidence band, plotted against the Open-Meteo API for comparison
-- Rolling 24h backtest metrics (MAE, RMSE, R², runtime)
-- 7-day forecast cards, switchable by model
-
-###  Model Benchmark & Leaderboard
-- Configurable benchmark run: station, target variable, train/test split ratio
-- Leaderboard of all 11 models ranked by a composite score (plus R², MAE, RMSE)
-- Auto-recommended model with a 1–10 overall score and reasoning, plus "fastest" and "most accurate" alternatives
-- Metric comparison chart, speed-vs-accuracy trade-off scatter, rolling-window stability analysis, per-model speed benchmark, and a regional performance heatmap across all 5 stations
-
-###  Anomaly Detection
-Flags observations that deviate significantly from model expectations.
-
-###  Model Guide
-A quick reference explaining what each model family assumes and when to reach for it.
-
-###  Report Export
-- Configure station, report title, analyst name, date range, and which sections to include (forecast, metrics, anomalies, ranking)
-- Export as a multi-sheet Excel workbook or an executive-summary PDF (charts + performance tables)
-- Live preview of report data before exporting
 
 ---
 
-##  Example Benchmark Run
-*Isfahan · temperature · 15% test split · 30.34s total runtime*
+## Features
+
+### Overview
+- Dataset stats: 5 stations, ~35,000 hourly records per city (4 years).
+- Historical temperature trend across all 5 stations, plus monthly averages.
+- Per-station climate summary table (avg/min/max temperature, humidity, total precipitation).
+- 5-step methodology pipeline and model-family cheat sheet.
+
+### Weather Forecast
+- **Live conditions card**: Temperature, feels-like, pressure, wind, humidity, dew point, visibility, cloud cover, UV index, and a 24h trend sparkline.
+- **Dynamic 24h Strip**: Past 24h + next 24h with weather icons. Clickable model pills dynamically update the strip and bold the selected model in the main chart.
+- **Main Forecast Chart**: 95% confidence band, past 6h actuals, and optional Open-Meteo API comparison overlay.
+- **Rolling 24h Backtest**: MAE, RMSE, R², and execution time for every selected model.
+- **7-Day Outlook (Cone of Uncertainty)**: 
+  - Plots 14 days of actual Max/Min history.
+  - Uses **Direct Multi-Horizon** models to forecast 7 days of Max/Min independently.
+  - Applies seasonal clamping and day-over-day smoothing to prevent illogical jumps.
+  - Optional **MOS Blending** to average ML output with Open-Meteo's NWP forecast.
+
+### Model Benchmark & Leaderboard
+- Runs a 24-hour hourly backtest (matching the forecast tab exactly).
+- Leaderboard ranked by a composite score (R², MAE, RMSE, MAPE, SMAPE).
+- Multivariate mode enabled by default for ML models (feeds humidity, wind, and pressure as covariates).
+- Auto-recommended model with a 1–10 overall score, "fastest" and "most accurate" alternatives.
+- Metric comparison charts, speed-vs-accuracy trade-off scatter, rolling-window stability, and a regional performance heatmap.
+
+### Anomaly Detection
+Flags observations that deviate significantly from model expectations using IQR and rolling-stats.
+
+### Model Guide
+A quick reference explaining what each model family assumes, complete with mathematical formulas (KaTeX) and pros/cons.
+
+### Report Export
+- Configure station, report title, analyst name, date range, and sections.
+- Export as a multi-sheet Excel workbook or an executive-summary PDF.
+
+---
+
+## Advanced Forecasting Methodology
+
+To overcome the limitations of tree-based models in time series extrapolation, the 7-day pipeline uses a multi-layered approach:
+
+1. **Anomaly Targeting**: Instead of predicting raw temperature (which requires the model to understand seasons), the system calculates the climatological mean for each day of the year. Models are trained to predict the *anomaly* (difference from the mean). This reduces the learning burden to short-term persistence.
+2. **Direct Multi-Horizon**: To prevent recursive error accumulation (where Day 7 is predicted based on Day 6's prediction), the system trains 7 independent models ($h=1...7$). Each model specializes in its specific horizon.
+3. **Feature Engineering**: Lags (1, 2, 3, 7, 14 days), rolling means/stds, rate-of-change, and covariate lags (humidity, pressure).
+4. **Safety Clamps**: Predictions are clamped to historical seasonal bounds (±15 days) to prevent physically impossible outputs (e.g., 15°C in August).
+5. **MOS Blending**: If enabled, the final ML prediction is averaged with Open-Meteo's live NWP forecast, combining local statistical learning with global atmospheric physics.
+
+---
+
+## Example Benchmark Run
+*Isfahan · temperature · 24h hourly test split · Multivariate*
 
 | Rank | Model | Composite Score | R² | MAE | RMSE | Runtime |
 |:---:|:---|:---:|:---:|:---:|:---:|:---:|
-| 1 | Random Forest | 0.008 | 0.898 | 2.089 | 2.835 | 7.78s |
-| 2 | XGBoost | 0.018 | 0.897 | 2.228 | 2.853 | 3.72s |
-| 3 | CatBoost | 0.049 | 0.852 | 2.751 | 3.408 | 3.91s |
-| 4 | SVM | 0.080 | 0.800 | 3.317 | 3.967 | 2.60s |
-| 5 | LightGBM | 0.093 | 0.747 | 3.714 | 4.460 | 4.25s |
-| 6 | Prophet | 0.139 | 0.693 | 4.148 | 4.919 | 4.78s |
-| 7 | ARIMA | 0.454 | -0.281 | 8.457 | 10.042 | 0.69s |
-| 8 | SARIMA | 0.460 | -0.308 | 8.553 | 10.149 | 0.78s |
-| 9 | Naive | 0.745 | -1.798 | 12.397 | 14.843 | 0.01s |
-| 10 | TBATS | 0.857 | -2.464 | 14.164 | 16.515 | 0.63s |
+| 1 | AutoML Ensemble | 0.004 | 0.966 | 0.721 | 0.858 | 12.4s |
+| 2 | SARIMA | 0.015 | 0.965 | 0.728 | 0.867 | 0.8s |
+| 3 | Naïve | 0.021 | 0.962 | 0.746 | 0.909 | 0.01s |
+| 4 | TBATS | 0.110 | 0.936 | 0.955 | 1.180 | 0.6s |
+| 5 | Random Forest | 0.250 | 0.902 | 1.188 | 1.460 | 7.8s |
+| 6 | Prophet | 0.310 | 0.897 | 1.272 | 1.495 | 4.8s |
+| 7 | XGBoost | 0.950 | 0.660 | 2.416 | 2.718 | 3.7s |
 
-Recommended model: **Random Forest** (overall score 9.9/10 — lowest error, highest R², best composite score). Fastest alternative: Naive (0.009s).
+*Note: In a 24-hour horizon, statistical models and Naïve baselines often compete closely with ML models due to weather persistence. The AutoML Ensemble consistently edges them out by blending the best performers.*
 
 ---
 
-##  Ensemble Formula
-The AutoML ensemble blends every model's forecast, weighted by inverse error, so more accurate models get proportionally more say in the final prediction:
+## Ensemble Formula
+The AutoML ensemble filters out weak models and blends the strong ones using a Softmax-weighted approach based on inverse RMSE:
 
 ```
 ŷ = Σ(w_i × ŷ_i)   |   w_i = exp(-β × RMSE_i) / Σ exp(-β × RMSE_j)
@@ -92,12 +104,12 @@ The AutoML ensemble blends every model's forecast, weighted by inverse error, so
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 | Layer | Technology / Packages |
 | :--- | :--- |
 | **Language & Framework** | R (≥ 4.3), Shiny, shinydashboard |
-| **Data Processing** | dplyr, tidyr, lubridate, zoo |
+| **Data Processing** | dplyr, tidyr, lubridate, zoo, readr |
 | **Statistical Modeling** | forecast, prophet |
 | **Machine Learning** | ranger (RF), xgboost, lightgbm, catboost, e1071 (SVM) |
 | **Visualization** | plotly, ggplot2, DT, shinycssloaders |
@@ -106,9 +118,9 @@ The AutoML ensemble blends every model's forecast, weighted by inverse error, so
 
 ---
 
-##  Data
+## Data
 
-Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026), via [Open-Meteo](https://open-meteo.com/):
+Historical hourly and daily weather data for 5 Iranian cities (~4 years), via [Open-Meteo](https://open-meteo.com/):
 
 | Station | Avg Temp | Min / Max | Avg Humidity | Total Precip. |
 |:---|:---:|:---:|:---:|:---:|
@@ -120,52 +132,41 @@ Daily weather data for 5 Iranian cities, ~2,008 days each (Dec 2020 – Jun 2026
 
 ---
 
-##  Methodology
-
-1. **Data collection** — pull hourly/daily variables from the Open-Meteo API (temperature, humidity, wind, precipitation)
-2. **Preprocessing** — fill missing values, aggregate hourly → daily, normalize
-3. **Chronological split** — time-based train/test split with no leakage (default 85% / 15%, adjustable in the benchmark settings)
-4. **Model training** — train all 11 models with tuned hyperparameters, plus the weighted AutoML ensemble
-5. **Evaluation** — compute RMSE, MAE, MAPE, R², SMAPE, and a composite score
-
----
-
-##  Project Structure
+## Project Structure
 
 ```text
 .
-├── app.R                     # Main application entry point
-├── global.R                  # Library imports, data loading, global functions
+├── app.R                     # Main application UI & Server
+├── global.R                  # Library imports, data loading, UTF-8 setup
+├── start.R                   # Launcher script (sets working dir, locale, port)
 ├── R/
-│   ├── modeling_utils.R      # Training and inference for all 11 models + ensemble
-│   ├── metrics_utils.R       # Error metrics and composite scoring
-│   └── explainer_utils.R     # Explainable AI (XAI) utilities
+│   ├── data_utils.R          # API downloaders, feature engineering, data cleaning
+│   ├── modeling_utils.R      # 11 models, Direct Multi-Horizon, Ensemble engine
+│   └── metrics_utils.R       # Error metrics and composite scoring
 └── modules/
-    ├── overview_module.R     # Landing page: stats, trends, methodology
-    ├── forecast_module.R     # Forecasting and live model comparison
-    ├── benchmark_module.R    # Leaderboard, stability, speed, regional heatmap
+    ├── home_module.R         # Landing page: stats, trends, methodology
+    ├── forecast_module.R     # Live forecasting, 24h strip, 7-day Cone chart
+    ├── leaderboard_module.R  # 24h hourly benchmark, stability, heatmap
     ├── anomaly_module.R      # Anomaly detection
-    ├── guide_module.R        # Model reference guide
+    ├── model_guide_module.R  # Model reference guide + KaTeX formulas
     └── report_module.R       # Excel/PDF report export
 ```
 
 ---
 
-##  Installation & Setup
+## Installation & Setup
 
 1. Install **R (≥ 4.3)** and **RStudio**.
 2. Install the required packages:
    ```r
    install.packages(c("shiny", "shinydashboard", "shinyWidgets", "DT", "plotly",
-                      "dplyr", "tidyr", "lubridate", "zoo", "httr", "jsonlite",
+                      "dplyr", "tidyr", "lubridate", "zoo", "httr", "jsonlite", "readr",
                       "forecast", "prophet", "ranger", "xgboost", "e1071",
-                      "writexl", "rmarkdown"))
+                      "openxlsx", "rmarkdown", "shinycssloaders"))
    ```
 3. (Optional) For boosting models, install these separately:
    ```r
    install.packages("lightgbm")
    # Follow the official CatBoost documentation to install it
    ```
-4. Clone the repository, open `app.R` in RStudio, and click **Run App**.
-
----
+4. Clone the repository, open `start.R` in RStudio, and click **Source** (or run `shiny::runApp()`).
