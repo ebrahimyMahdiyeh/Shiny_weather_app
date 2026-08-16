@@ -8,95 +8,6 @@ library(dplyr)
 library(lubridate)
 library(zoo)
 
-# --------------------------------------------------
-# Feature Engineering (Physical indices + Time-based Lags)
-# --------------------------------------------------
-add_engineered_features <- function(df) {
-  if (nrow(df) == 0) return(df)
-  
-  df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
-  df$temperature <- as.numeric(df$temperature)
-  
-  # 1. Create a complete hourly grid to ensure lags are time-based, not row-based
-  min_t <- min(df$timestamp, na.rm = TRUE)
-  max_t <- max(df$timestamp, na.rm = TRUE)
-  full_time <- seq(min_t, max_t, by = "hour")
-  full_df <- data.frame(timestamp = full_time)
-  
-  # Merge existing data into the complete grid
-  df <- merge(full_df, df, by = "timestamp", all.x = TRUE)
-  df <- df[order(df$timestamp), ]
-  
-  # 2. Interpolate missing values
-  if (any(is.na(df$temperature))) {
-    df$temperature <- zoo::na.approx(df$temperature, na.rm = FALSE)
-    df$temperature <- zoo::na.locf(df$temperature, na.rm = FALSE)
-    df$temperature <- zoo::na.locf(df$temperature, fromLast = TRUE, na.rm = FALSE)
-  }
-  
-  df$hour <- lubridate::hour(df$timestamp)
-  df$day_of_year <- lubridate::yday(df$timestamp)
-  
-  # Physical feature: Solar radiation approximation
-  solar_angle <- sin(2 * pi * (df$hour - 6) / 24)
-  solar_angle[solar_angle < 0] <- 0
-  df$solar_rad <- solar_angle * (1 + cos(2 * pi * (df$day_of_year - 172) / 365))
-  
-  # Physical feature: Rain rule
-  if ("humidity" %in% names(df) && "pressure" %in% names(df)) {
-    df$rain_prob_rule <- as.numeric(!is.na(df$humidity) & !is.na(df$pressure) & df$humidity > 80 & df$pressure < 1010)
-  } else {
-    df$rain_prob_rule <- 0
-  }
-  
-  # Smooth temperature
-  df$smooth_temperature <- zoo::rollmean(df$temperature, k = 3, fill = NA, align = "right")
-  
-  # Time-accurate hourly lags
-  df$lag_1h  <- dplyr::lag(df$temperature, 1)
-  df$lag_2h  <- dplyr::lag(df$temperature, 2)
-  df$lag_3h  <- dplyr::lag(df$temperature, 3)
-  df$lag_24h <- dplyr::lag(df$temperature, 24)
-  df$lag_48h <- dplyr::lag(df$temperature, 48)
-  df$lag_72h <- dplyr::lag(df$temperature, 72)
-  
-  # Rolling means
-  df$rolling_6h  <- zoo::rollmean(df$temperature, k = 6,  fill = NA, align = "right")
-  df$rolling_24h <- zoo::rollmean(df$temperature, k = 24, fill = NA, align = "right")
-  
-  # Fill station_id if missing due to grid expansion
-  if ("station_id" %in% names(df)) {
-    df$station_id <- df$station_id[1]
-  }
-  
-  return(df)
-}
-
-# --------------------------------------------------
-# Add daily temp_max / temp_min (AFTER features)
-# --------------------------------------------------
-add_daily_min_max <- function(df) {
-  if (nrow(df) == 0) return(df)
-  
-  df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
-  df$date_only <- as.Date(df$timestamp, tz = "Asia/Tehran")
-  
-  daily_summary <- df %>%
-    dplyr::group_by(date_only) %>%
-    dplyr::summarise(
-      temp_max = if (all(is.na(temperature))) NA_real_ else max(temperature, na.rm = TRUE),
-      temp_min = if (all(is.na(temperature))) NA_real_ else min(temperature, na.rm = TRUE),
-      .groups = "drop"
-    )
-  
-  df$temp_max <- NULL
-  df$temp_min <- NULL
-  
-  df <- dplyr::left_join(df, daily_summary, by = "date_only")
-  df$date_only <- NULL
-  
-  return(df)
-}
 
 # --------------------------------------------------
 # Find data directory
@@ -263,6 +174,95 @@ download_all_weather_data <- function(full_start_date = "2021-01-01", out_dir = 
   }
   
   return(invisible(all_data))
+}
+# --------------------------------------------------
+# Feature Engineering (Physical indices + Time-based Lags)
+# --------------------------------------------------
+add_engineered_features <- function(df) {
+  if (nrow(df) == 0) return(df)
+  
+  df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
+  df$temperature <- as.numeric(df$temperature)
+  
+  # 1. Create a complete hourly grid to ensure lags are time-based, not row-based
+  min_t <- min(df$timestamp, na.rm = TRUE)
+  max_t <- max(df$timestamp, na.rm = TRUE)
+  full_time <- seq(min_t, max_t, by = "hour")
+  full_df <- data.frame(timestamp = full_time)
+  
+  # Merge existing data into the complete grid
+  df <- merge(full_df, df, by = "timestamp", all.x = TRUE)
+  df <- df[order(df$timestamp), ]
+  
+  # 2. Interpolate missing values
+  if (any(is.na(df$temperature))) {
+    df$temperature <- zoo::na.approx(df$temperature, na.rm = FALSE)
+    df$temperature <- zoo::na.locf(df$temperature, na.rm = FALSE)
+    df$temperature <- zoo::na.locf(df$temperature, fromLast = TRUE, na.rm = FALSE)
+  }
+  
+  df$hour <- lubridate::hour(df$timestamp)
+  df$day_of_year <- lubridate::yday(df$timestamp)
+  
+  # Physical feature: Solar radiation approximation
+  solar_angle <- sin(2 * pi * (df$hour - 6) / 24)
+  solar_angle[solar_angle < 0] <- 0
+  df$solar_rad <- solar_angle * (1 + cos(2 * pi * (df$day_of_year - 172) / 365))
+  
+  # Physical feature: Rain rule
+  if ("humidity" %in% names(df) && "pressure" %in% names(df)) {
+    df$rain_prob_rule <- as.numeric(!is.na(df$humidity) & !is.na(df$pressure) & df$humidity > 80 & df$pressure < 1010)
+  } else {
+    df$rain_prob_rule <- 0
+  }
+  
+  # Smooth temperature
+  df$smooth_temperature <- zoo::rollmean(df$temperature, k = 3, fill = NA, align = "right")
+  
+  # Time-accurate hourly lags
+  df$lag_1h  <- dplyr::lag(df$temperature, 1)
+  df$lag_2h  <- dplyr::lag(df$temperature, 2)
+  df$lag_3h  <- dplyr::lag(df$temperature, 3)
+  df$lag_24h <- dplyr::lag(df$temperature, 24)
+  df$lag_48h <- dplyr::lag(df$temperature, 48)
+  df$lag_72h <- dplyr::lag(df$temperature, 72)
+  
+  # Rolling means
+  df$rolling_6h  <- zoo::rollmean(df$temperature, k = 6,  fill = NA, align = "right")
+  df$rolling_24h <- zoo::rollmean(df$temperature, k = 24, fill = NA, align = "right")
+  
+  # Fill station_id if missing due to grid expansion
+  if ("station_id" %in% names(df)) {
+    df$station_id <- df$station_id[1]
+  }
+  
+  return(df)
+}
+
+# --------------------------------------------------
+# Add daily temp_max / temp_min (AFTER features)
+# --------------------------------------------------
+add_daily_min_max <- function(df) {
+  if (nrow(df) == 0) return(df)
+  
+  df$timestamp <- as.POSIXct(df$timestamp, tz = "Asia/Tehran")
+  df$date_only <- as.Date(df$timestamp, tz = "Asia/Tehran")
+  
+  daily_summary <- df %>%
+    dplyr::group_by(date_only) %>%
+    dplyr::summarise(
+      temp_max = if (all(is.na(temperature))) NA_real_ else max(temperature, na.rm = TRUE),
+      temp_min = if (all(is.na(temperature))) NA_real_ else min(temperature, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  df$temp_max <- NULL
+  df$temp_min <- NULL
+  
+  df <- dplyr::left_join(df, daily_summary, by = "date_only")
+  df$date_only <- NULL
+  
+  return(df)
 }
 
 # --------------------------------------------------

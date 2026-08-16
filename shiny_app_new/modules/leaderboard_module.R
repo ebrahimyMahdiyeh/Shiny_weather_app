@@ -68,7 +68,7 @@ leaderboardUI <- function(id) {
                       tags$div(class="lb-hero",
                                tags$div(class="badge", tags$i(class="fa fa-trophy"), "Benchmark · ۱۲ مدل · ارزیابی روی داده ساعتی"),
                                tags$h2("رتبه‌بندی مدل‌های پیش‌بینی"),
-                               tags$p("ارزیابی جامع ۱۲ مدل بر اساس ۷۲ ساعت آینده (افق ۳ روزه) دقیقاً مشابه تب پیش‌بینی."),
+                               tags$p("ارزیابی جامع ۱۲ مدل بر اساس  ۲۴ ساعت اینده (افق ۳ روزه) دقیقاً مشابه تب پیش‌بینی."),
                                uiOutput(ns("lb_stats_ui"))
                       )
                )
@@ -194,7 +194,7 @@ leaderboardServer <- function(id, weather_data) {
           start_time <- Sys.time()
           
           # افق پیش‌بینی ۷۲ ساعت (۳ روز)
-          test_h <- 72
+          test_h <- 24
           if (nrow(df) <= test_h) test_h <- floor(nrow(df) / 4)
           
           train_df <- head(df, nrow(df) - test_h)
@@ -222,9 +222,10 @@ leaderboardServer <- function(id, weather_data) {
             
             # استفاده از run_hourly_model دقیقا مثل تب پیش‌بینی
             fc <- tryCatch(
-              run_hourly_model(mn, train_df, test_h, target),
+              run_hourly_model(mn, train_df, test_h, target, use_multivariate = TRUE),
               error = function(e) { message("خطا در مدل ", mn, ": ", e$message); NULL }
             )
+            
             t_end <- Sys.time()
             exec_time <- as.numeric(difftime(t_end, t_start, units = "secs"))
             
@@ -401,8 +402,8 @@ leaderboardServer <- function(id, weather_data) {
             }
             
             fc <- tryCatch(
-              run_hourly_model(mn, train_df_reg, test_h_reg, target),
-              error = function(e) NULL
+              run_hourly_model(mn, train_df, test_h, target, use_multivariate = TRUE),
+              error = function(e) { message("خطا در مدل ", mn, ": ", e$message); NULL }
             )
             if(!is.null(fc) && !is.null(fc$predictions) && length(fc$predictions) > 0) {
               preds <- fc$predictions[seq_len(min(test_h_reg, length(fc$predictions)))]
