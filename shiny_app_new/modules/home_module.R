@@ -12,7 +12,7 @@ homeUI <- function(id) {
              tags$div(class = "hero-banner",
                       tags$div(
                         style = "display:inline-flex;align-items:center;gap:6px;background:var(--input-bg);border:1px solid var(--border);color:var(--blue2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;margin-bottom:12px;",
-                        tags$i(class="fa fa-graduation-cap"), " پروژه پژوهشی — IEEE Publication 2025"
+                        tags$i(class="fa fa-graduation-cap"), " پروژه پژوهشی دانشجویی"
                       ),
                       tags$h2(
                         "سامانه هوشمند پیش‌بینی ",
@@ -21,7 +21,7 @@ homeUI <- function(id) {
                       tags$p(
                         "مقایسه جامع ۱۱ مدل سری زمانی شامل روش‌های کلاسیک (ARIMA، SARIMA، ETS)،",
                         " یادگیری ماشین (RF، XGBoost، LightGBM، CatBoost، SVM) و مدل‌های مدرن (Prophet)",
-                        " با استفاده از داده‌های هواشناسی ۵ ایستگاه ایران در بازه ۲۰۲۱–۲۰۲۵."
+                        " با استفاده از داده‌های هواشناسی ۵ ایستگاه ایران در بازه ۲۰۲۱–۲۰۲۶."
                       ),
                       tags$div(class = "hero-chips",
                                tags$span(class="hchip hchip-blue",  tags$i(class="fa fa-chart-bar"),  " ARIMA · SARIMA"),
@@ -93,7 +93,7 @@ homeUI <- function(id) {
         ),
         width = 7, solidHeader = FALSE,
         tags$div(style="margin-bottom:10px;font-size:12px;color:var(--text3);",
-                 "داده روزانه · ۲۰۲۱–۲۰۲۵ · بدون نشت اطلاعات در تقسیم train/test"
+                 "داده روزانه · ۲۰۲۱–۲۰۲۶ · بدون نشت اطلاعات در تقسیم train/test"
         ),
         DT::DTOutput(ns("station_summary_table"))
       ),
@@ -148,19 +148,91 @@ homeUI <- function(id) {
                         "ویژگی‌های lag و rolling-window با Early Stopping")
         ),
         tags$div(
-          style = "margin-top:10px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:12px 14px;",
-          tags$div(style="display:flex;align-items:center;gap:8px;margin-bottom:6px;",
-                   tags$div(style="width:8px;height:8px;border-radius:50%;background:#22c55e;"),
-                   tags$span(style="font-size:14px;font-weight:800;color:var(--text);", "AutoML Ensemble (وزن‌دار)"),
-                   tags$span(style="margin-right:auto;background:rgba(34,197,94,0.15);color:#4ade80;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;", "بهترین عملکرد کلی")
+          style = "
+    margin-top:10px;
+    background:rgba(34,197,94,0.05);
+    border:1px solid rgba(34,197,94,0.2);
+    border-radius:8px;
+    padding:12px 14px;
+  ",
+          
+          # Header
+          tags$div(
+            style = "
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:8px;
+    ",
+            tags$div(
+              style = "
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:#22c55e;
+        box-shadow:0 0 6px rgba(34,197,94,0.5);
+      "
+            ),
+            tags$span(
+              style="font-size:14px;font-weight:800;color:var(--text);",
+              "AutoML Ensemble (وزن‌دار)"
+            ),
+            tags$span(
+              style="
+        margin-right:auto;
+        background:rgba(34,197,94,0.15);
+        color:#4ade80;
+        border-radius:4px;
+        padding:3px 8px;
+        font-size:11px;
+        font-weight:700;
+      ",
+              "بهترین عملکرد کلی"
+            )
           ),
+          
+          # Formula
           tags$div(
             class = "formula-box",
-            style = "font-size:14px;margin:4px 0;",
-            "ŷ = Σ(w_i × ŷ_i)   |   w_i = exp(-β × RMSE_i) / Σ exp(-β × RMSE_j)"
+            style = "
+              margin:10px 0;
+              padding:15px 12px;
+              text-align:center;
+              background:rgba(0,0,0,0.08);
+              border-radius:6px;
+              direction:ltr;
+            ",
+            tags$div(
+              style="display:inline-flex; align-items:center; gap:20px; font-size:17px; font-weight:600; color:var(--text);",
+              
+              # بخش اول فرمول
+              tags$span("ŷ = Σᵢ (wᵢ × ŷᵢ)"),
+              
+              # خط جدا کننده عمودی
+              tags$span(style="color:var(--text3); font-size:24px; font-weight:300;", "|"),
+              
+              # بخش دوم فرمول (با کسر واقعی)
+              tags$div(
+                style="display:inline-flex; align-items:center; gap:8px;",
+                tags$span("wᵢ ="),
+                tags$div(
+                  style="display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; line-height:1.3;",
+                  tags$span(style="border-bottom:1.5px solid var(--text2); padding:0 8px 3px; font-size:15px;", "exp(−β × RMSEᵢ)"),
+                  tags$span(style="padding:3px 8px 0; font-size:15px;", "Σⱼ exp(−β × RMSEⱼ)")
+                )
+              )
+            )
           ),
-          tags$div(style="font-size:13px;color:var(--text2);",
-                   "ترکیب وزن‌دار بهترین مدل‌ها بر اساس نمره ترکیبی"
+          
+          # Description
+          tags$div(
+            style="
+      font-size:13px;
+      color:var(--text2);
+      text-align:center;
+      margin-top:5px;
+    ",
+            "ترکیب وزن‌دار بهترین مدل‌ها بر اساس نمره ترکیبی"
           )
         )
       ),
@@ -306,8 +378,8 @@ homeServer <- function(id, weather_data, hourly_data = NULL) {
     output$box_years <- shinydashboard::renderInfoBox({
       shinydashboard::infoBox(
         title    = "بازه زمانی داده",
-        value    = "۴ سال",
-        subtitle = "۲۰۲۱–۲۰۲۵ · داده روزانه",
+        value    = "۵ سال",
+        subtitle = "۲۰۲۱–۲۰۲۶ · داده روزانه",
         icon     = icon("calendar-days"),
         color    = "red",
         fill     = TRUE

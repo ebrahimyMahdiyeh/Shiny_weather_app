@@ -431,3 +431,98 @@ advanced_clean_data <- function(df) {
   df$month <- NULL
   return(df)
 }
+# ── تابع آپدیت هوشمند (Incremental Update) ──
+incremental_update_csvs <- function() {
+  if (!exists("STATIONS")) return()
+  cities <- names(STATIONS)
+  
+  if (exists("DATA_DIR", envir = globalenv())) {
+    data_dir <- get("DATA_DIR", envir = globalenv())
+  } else {
+    data_dir <- file.path(getwd(), "data")
+  }
+  
+  for (city in cities) {
+    file_name <- file.path(data_dir, paste0("weather_", city, ".csv"))
+    if (!file.exists(file_name)) next
+    
+    cat("Checking for updates:", city, "...\n")
+    
+    # ۱. خواندن فایل CSV فعلی
+    df <- utils::read.csv(file_name, stringsAsFactors = FALSE, encoding = "UTF-8")
+    df$timestamp <- as.POSIXct(df$timestamp, format = "%Y-%m-%d %H:%M:%S", tz = "Asia/Tehran")
+    
+    last_ts <- max(df$timestamp, na.rm = TRUE)
+    
+    if (as.numeric(difftime(Sys.time(), last_ts, units = "hours")) < 1) {
+      cat("  -> Data is up to date.\n")
+      next
+    }
+    
+    start_date <- as.Date(last_ts)
+    cat("  -> Fetching new data from", as.character(start_date), "to now...\n")
+    
+    new_data <- tryCatch({
+      download_historical_data(city, start_date, Sys.Date())
+    }, error = function(e) {
+      message("  -> Error fetching new data: ", e$message)
+      NULL
+    })
+    
+    if (!is.null(new_data) && nrow(new_data) > 0) {
+      new_data <- new_data[as.POSIXct(new_data$timestamp, tz = "Asia/Tehran") > last_ts, ]
+      
+      if (nrow(new_data) > 0) {
+        # ۲. اعمال ویژگی‌های مهندسی شده روی داده‌های جدید
+        new_data <- add_engineered_features(new_data)
+        
+        # ۳. ترکیب داده‌های قدیمی و جدید با bind_rows (جلوگیری از خطای تداخل ستون‌ها)
+        df$timestamp <- format(df$timestamp, "%Y-%m-%d %H:%M:%S")
+        new_data$timestamp <- format(new_data$timestamp, "%Y-%m-%d %H:%M:%S")
+        
+        # 🔴 استفاده از bind_rows به جای rbind
+        combined <- dplyr::bind_rows(df, new_data)
+        combined <- combined[!duplicated(combined$timestamp), ]
+        
+        # ۴. محاسبه مجدد temp_max و temp_min برای کل داده‌ها (یا حداقل برای داده‌های جدید)
+        combined$timestamp <- as.POSIXct(combined$timestamp, format = "%Y-%m-%d %H:%M:%S", tz = "Asia/Tehran")
+        combined$date_only <- as.Date(combined$timestamp)
+        
+        # اگر ستون‌های مکس/مین وجود ندارند، بسازیم
+        if (!"temp_max" %in% names(combined)) combined$temp_max <- NA
+        if (!"temp_min" %in% names(combined)) combined$temp_min <- NA
+        
+        # پیدا کردن ردیف‌هایی که مکس/مین نال هستند (یعنی داده‌های جدید هستند)
+        missing_idx <- is.na(combined$temp_max) | is.na(combined$temp_min)
+        if (any(missing_idx)) {
+          daily_summary <- combined[missing_idx, ] %>%
+            dplyr::group_by(date_only) %>%
+            dplyr::summarise(
+              temp_max = if (all(is.na(temperature))) NA_real_ else max(temperature, na.rm = TRUE),
+              temp_min = if (all(is.na(temperature))) NA_real_ else min(temperature, na.rm = TRUE),
+              .groups = "drop"
+            )
+          
+          # جایگذاری مقادیر محاسبه شده در ردیف‌های نال
+          for (i in which(missing_idx)) {
+            d <- combined$date_only[i]
+            match_row <- daily_summary[daily_summary$date_only == d, ]
+            if (nrow(match_row) > 0) {
+              combined$temp_max[i] <- match_row$temp_max
+              combined$temp_min[i] <- match_row$temp_min
+            }
+          }
+        }
+        
+        combined$date_only <- NULL
+        
+        # ۵. ذخیره مجدد در فایل CSV
+        combined$timestamp <- format(combined$timestamp, "%Y-%m-%d %H:%M:%S")
+        write.csv(combined, file_name, row.names = FALSE)
+        cat("  -> Successfully updated with", nrow(new_data), "new rows.\n")
+      } else {
+        cat("  -> No new data found yet.\n")
+      }
+    }
+  }
+}

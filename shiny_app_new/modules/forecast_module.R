@@ -284,7 +284,7 @@ forecastUI <- function(id) {
                                  choices = c(
                                    "ARIMA"="arima", "SARIMA"="sarima", "ETS"="ets", "TBATS"="tbats",
                                    "Prophet"="prophet", "Random Forest"="rf", "XGBoost"="xgboost",
-                                   "LightGBM"="lightgbm", "CatBoost"="catboost", "SVM"="svm", "Naïve"="naive",
+                                   "LightGBM"="lightgbm", "CatBoost"="catboost", "Naïve"="naive",
                                    "AutoML Ensemble"="ensemble"
                                  ),
                                  selected = "xgboost", multiple = TRUE,
@@ -373,7 +373,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
     observeEvent(input$refresh, { req(input$station); live_data(do_fetch(input$station)) })
     
     output$last_update <- renderText({
-      if (is.null(live_data())) "— دریافت نشده" else paste0("بروز: ", format(Sys.time(), "%H:%M"))
+      if (is.null(live_data())) "— دریافت نشده" else paste0("بروزرسانی: ", format(Sys.time(), "%Y-%m-%d ساعت %H:%M"))
     })
     
     MODEL_META <- list(
@@ -381,11 +381,11 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       ets=list(label="ETS",color="#14b8a6"), tbats=list(label="TBATS",color="#0d9488"),
       prophet=list(label="Prophet",color="#8b5cf6"), rf=list(label="Random Forest",color="#f59e0b"),
       xgboost=list(label="XGBoost",color="#d97706"), lightgbm=list(label="LightGBM",color="#22d3ee"),
-      catboost=list(label="CatBoost",color="#fb7185"), svm=list(label="SVM",color="#ef4444"),
+      catboost=list(label="CatBoost",color="#fb7185"), 
       naive=list(label="Naïve",color="var(--text3)"),
       ensemble=list(label="AutoML Ensemble",color="#22c55e") 
     )
-    ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
+    ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost")
     
     output$active_model_lbl <- renderText({
       models <- input$selected_models
@@ -558,16 +558,13 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         all_feat_imp  <- list() 
         
         # ── آماده‌سازی مستقیم داده روزانه برای مکس و مین ──
-        # ── آماده‌سازی مستقیم داده روزانه برای مکس و مین ──
         daily_df <- NULL
         if (target == "temperature") {
           raw_daily <- weather_data()[[sid]]
           if (!is.null(raw_daily) && nrow(raw_daily) > 30 && all(c("temp_max", "temp_min") %in% names(raw_daily))) {
             
-            # 🔴 راهکار ۲: اجرای پاکسازی پیشرفته (حذف نویز و IQR) قبل از مدل‌سازی
             daily_df <- tryCatch(advanced_clean_data(raw_daily), error = function(e) raw_daily)
             
-            # اطمینان از صحت ستون‌ها و پر کردن ایمن مقادیر گمشده
             if (!all(c("temp_max", "temp_min") %in% names(daily_df))) {
               daily_df <- NULL
             } else {
@@ -603,16 +600,13 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
             if (!is.null(res_final$feat_imp)) all_feat_imp[[mn]] <- res_final$feat_imp
           }
           
-          # ── ۲. پیش‌بینی ۷ روز آینده (مستقیماً روی مکس و مین) ──
           # ── ۲. پیش‌بینی ۷ روز آینده (Direct Multi-Horizon روی مکس و مین) ──
           if (!is.null(daily_df) && nrow(daily_df) > 30) {
             
             df_max <- daily_df
             df_min <- daily_df
             
-            # استفاده از موتور Direct برای مکس
             res_7d_max <- tryCatch(forecast_direct_ml(df_max, 7, target = "temp_max", model_type = mn), error = function(e) NULL)
-            # استفاده از موتور Direct برای مین
             res_7d_min <- tryCatch(forecast_direct_ml(df_min, 7, target = "temp_min", model_type = mn), error = function(e) NULL)
             
             if (!is.null(res_7d_max) && !is.null(res_7d_min) && 
@@ -642,14 +636,13 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
               if (isTRUE(input$compare_om) && !is.null(ld) && !is.null(ld$daily) && nrow(ld$daily) > 0) {
                 om_future <- ld$daily[ld$daily$date %in% future_dates, ]
                 if (nrow(om_future) == 7) {
-                  # مدل ۵۰٪ از یادگیری محلی ML و ۵۰٪ از پیش‌بینی اتمسفری OM می‌گیرد
                   preds_max <- (preds_max + as.numeric(om_future$temp_max)) / 2
                   preds_min <- (preds_min + as.numeric(om_future$temp_min)) / 2
-                  preds_max <- pmax(preds_max, preds_min + 0.5) # حفظ منطق فیزیکی پس از ترکیب
+                  preds_max <- pmax(preds_max, preds_min + 0.5) 
                 }
               }
               
-              # 🔴 راهکار ۴: محدودسازی نوسان روزانه (نهایتاً ۳ درجه تغییر در روز)
+              # 🔴 محدودسازی نوسان روزانه (نهایتاً ۳ درجه تغییر در روز)
               for(i in 2:7) {
                 if (abs(preds_max[i] - preds_max[i-1]) > 3) {
                   preds_max[i] <- preds_max[i-1] + sign(preds_max[i] - preds_max[i-1]) * 3
@@ -832,6 +825,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
         hourly_ml_pred(NULL)
       })
     }
+    
     # ── NOW CARD (Premium UI) ──
     output$now_card <- renderUI({
       ld <- live_data(); sid <- input$station %||% names(STATIONS)[1]
@@ -1145,7 +1139,7 @@ forecastServer <- function(id, weather_data, hourly_data = NULL) {
       current_sel <- daily_selected_model()
       if (is.null(current_sel) || !current_sel %in% models) {
         daily_selected_model(models[1])
-        current_sel <- models[1]
+        current_sel = models[1]
       }
       
       pills <- lapply(models, function(mn) {

@@ -1,8 +1,6 @@
 # File: modules/anomaly_module.R
 # ماژول کنترل کیفیت و تشخیص ناهنجاری هواشناسی (Advanced Meteorological QC)
 
-# ── توابع کنترل کیفیت (QC) ───────────────────────────────────────────────────
-
 # روش ۱: محدودیت‌های فیزیکی
 detect_physical_limits <- function(df, target = "temperature") {
   limits <- list(
@@ -12,6 +10,7 @@ detect_physical_limits <- function(df, target = "temperature") {
     precipitation = c(0, 300)
   )
   lim <- limits[[target]]
+  if (is.null(lim)) stop("متغیر هدف برای محدودیت فیزیکی نامعتبر است.")
   
   df %>%
     dplyr::mutate(
@@ -29,8 +28,10 @@ detect_temporal_qc <- function(df, target = "temperature", window = 24) {
   diffs <- abs(c(0, diff(vals)))
   step_anomaly <- diffs > step_threshold
   
-  roll_var <- zoo::rollapply(vals, width = window, FUN = sd, fill = 0, align = "right")
-  stuck_anomaly <- roll_var == 0 & !is.na(vals)
+  # 🔴 اصلاح: fill = NA قرار دادیم تا ابتدای داده‌ها اشتباهی ناهنجاری نشوند
+  roll_var <- zoo::rollapply(vals, width = window, FUN = sd, fill = NA, align = "right")
+  # سنسور فقط وقتی گیر کرده است که واریانس صفر باشد و داده‌های کافی داشته باشیم (نه NA)
+  stuck_anomaly <- !is.na(roll_var) & roll_var == 0 & !is.na(vals)
   
   df %>%
     dplyr::mutate(
@@ -42,13 +43,24 @@ detect_temporal_qc <- function(df, target = "temperature", window = 24) {
 
 # روش ۳: کنترل کیفیت آماری و فصلی
 detect_climatological_qc <- function(df, target = "temperature", threshold = 3.0) {
+  
+  # 🔴 اگر داده ساعتی است، ساعت را هم در گروه‌بندی وارد می‌کنیم
+  if ("timestamp" %in% names(df)) {
+    df <- df %>% dplyr::mutate(hour = lubridate::hour(timestamp))
+    group_cols <- c("doy", "hour")
+  } else {
+    group_cols <- "doy"
+  }
+  
   df %>%
-    dplyr::mutate(doy = lubridate::yday(date)) %>%
-    dplyr::group_by(doy) %>%
+    dplyr::mutate(doy = lubridate::yday(.data$date)) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) %>%
     dplyr::mutate(
+      n_obs = dplyr::n(),
       clim_mean = mean(.data[[target]], na.rm = TRUE),
       clim_sd   = sd(.data[[target]], na.rm = TRUE),
-      z_score   = abs((.data[[target]] - clim_mean) / (clim_sd + 1e-6))
+      # 🔴 اصلاح: اگر فقط یک سال داده داریم (n_obs < 2) یا انحراف معیار صفر است، z_score صفر است
+      z_score   = ifelse(n_obs < 2 | is.na(clim_sd) | clim_sd == 0, 0, abs((.data[[target]] - clim_mean) / clim_sd))
     ) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(
@@ -61,21 +73,27 @@ detect_climatological_qc <- function(df, target = "temperature", threshold = 3.0
 # روش ۴: تشخیص تغییر فاز سنسور
 detect_change_points <- function(df, target = "temperature", window = 30) {
   vals <- df[[target]]
-  roll_mean <- zoo::rollmean(vals, k = window, fill = NA, align = "center")
   
-  mean_diff <- abs(c(0, diff(roll_mean)))
+  # استفاده از align="right" تا فقط از داده‌های گذشته برای محاسبه میانگین استفاده شود
+  roll_mean <- zoo::rollmean(vals, k = window, fill = NA, align = "right")
+  
+  # 🔴 اصلاح بحرانی: استفاده از NA به جای 0 برای جلوگیری از شیفت ردیف‌ها
+  # تابع diff طول را یکی کم می‌کند، پس اولین خانه را با NA پر می‌کنیم تا طول با df برابر شود
+  mean_diff <- c(NA, abs(diff(roll_mean)))
+  
+  mean_diff_mean <- mean(mean_diff, na.rm = TRUE)
   mean_diff_sd <- sd(mean_diff, na.rm = TRUE)
   
-  cp_threshold <- mean(mean_diff, na.rm = TRUE) + 3 * mean_diff_sd
+  # اگر داده‌ها ثابت باشند و انحراف معیار صفر شود، آستانه را بی‌نهایت می‌گیریم تا هیچ ناهنجاری اشتباهی ثبت نشود
+  cp_threshold <- ifelse(is.na(mean_diff_sd) || mean_diff_sd == 0, Inf, mean_diff_mean + 3 * mean_diff_sd)
   
   df %>%
     dplyr::mutate(
-      is_anomaly = mean_diff > cp_threshold & !is.na(mean_diff),
+      is_anomaly = !is.na(mean_diff) & mean_diff > cp_threshold,
       anomaly_score = ifelse(is_anomaly, mean_diff / (cp_threshold + 1e-6), 0),
       method = "تشخیص تغییر فاز سنسور"
     )
 }
-
 # ── UI ───────────────────────────────────────────────────────────────────────
 anomalyUI <- function(id) {
   ns <- NS(id)
@@ -149,7 +167,7 @@ anomalyServer <- function(id, weather_data) {
                      "physical" = list(
                        icon = "fa-thermometer-half", color = "#ef4444",
                        title = "بررسی محدودیت‌های فیزیکی",
-                       desc = "این روش مقادیر غیرممکن فیزیکی را بررسی می‌کند. مثلاً دمای زیر ۴۰- یا بالای ۵۵ درجه، یا رطوبت بیش از ۱۰۰ درصد که نشان‌دهنده خطای سنسور یا ثبت داده است را به عنوان ناهنجاری علامت‌گذاری می‌کند."
+                       desc = "این روش مقادیر غیرممکن فیزیکی را بررسی می‌کند. مثلاً دمای زیر ۲۵- یا بالای ۵۵ درجه، یا رطوبت بیش از ۱۰۰ درصد که نشان‌دهنده خطای سنسور یا ثبت داده است را به عنوان ناهنجاری علامت‌گذاری می‌کند."
                      ),
                      "temporal" = list(
                        icon = "fa-clock", color = "#fbbf24",
@@ -189,7 +207,14 @@ anomalyServer <- function(id, weather_data) {
       target <- input$target_var
       method <- input$method
       
-      df <- weather_data()[[sid]] %>% dplyr::arrange(date) %>% dplyr::filter(!is.na(.data[[target]]))
+      df <- weather_data()[[sid]]
+      
+      # 🔴 اگر داده ساعتی است و timestamp دارد، ستون date می‌سازیم
+      if (!"date" %in% names(df) && "timestamp" %in% names(df)) {
+        df$date <- as.Date(df$timestamp)
+      }
+      
+      df <- df %>% dplyr::arrange(.data$date) %>% dplyr::filter(!is.na(.data[[target]]))
       if (nrow(df) < 14) {
         showNotification("داده کافی برای کنترل کیفیت وجود ندارد.", type = "error")
         return()
@@ -217,28 +242,29 @@ anomalyServer <- function(id, weather_data) {
     })
     
     # ── نمودار ناهنجاری ──────────────────────────────────────────────────────
+    # ── نمودار ناهنجاری ──────────────────────────────────────────────────────
     output$anomaly_plot <- plotly::renderPlotly({
       req(anomaly_result())
       res    <- anomaly_result()
       target <- input$target_var
       
-      normal_df  <- res %>% dplyr::filter(!is_anomaly)
+      # فقط نقاط ناهنجار را فیلتر می‌کنیم (خط اصلی را کامل می‌کشیم)
       anomaly_df <- res %>% dplyr::filter(is_anomaly)
       
       p <- plotly::plot_ly()
       
-      # سری اصلی (داده‌های عادی)
-      p <- plotly::add_trace(p, data = normal_df, x = ~date, y = as.formula(paste0("~`", target, "`")),
-                             type = 'scatter', mode = 'lines', name = 'داده عادی',
+      # ۱. رسم کل سری زمانی به عنوان خط اصلی (بدون حذف ناهنجاری‌ها)
+      p <- plotly::add_trace(p, data = res, x = ~date, y = as.formula(paste0("~`", target, "`")),
+                             type = 'scatter', mode = 'lines', name = 'روند داده',
                              line = list(color = 'rgba(59, 130, 246, 0.6)', width = 1.5),
                              hoverinfo = 'text',
                              text = ~paste("تاریخ:", date, "<br>مقدار:", round(.data[[target]], 2)))
       
-      # نقاط ناهنجار
+      # ۲. برجسته کردن نقاط ناهنجار روی همان خط
       if (nrow(anomaly_df) > 0) {
         p <- plotly::add_trace(p, data = anomaly_df, x = ~date, y = as.formula(paste0("~`", target, "`")),
                                type = 'scatter', mode = 'markers', name = 'داده پرت (Anomaly)',
-                               marker = list(color = '#ef4444', size = 10, symbol = 'x', line = list(color = 'white', width = 1)),
+                               marker = list(color = '#ef4444', size = 12, symbol = 'x', line = list(color = 'white', width = 1)),
                                hoverinfo = 'text',
                                text = ~paste("تاریخ:", date, "<br>مقدار:", round(.data[[target]], 2), "<br>نمره:", round(anomaly_score, 3)))
       }

@@ -66,9 +66,9 @@ leaderboardUI <- function(id) {
              fluidRow(
                column(12,
                       tags$div(class="lb-hero",
-                               tags$div(class="badge", tags$i(class="fa fa-trophy"), "Benchmark · ۱۲ مدل · ارزیابی روی داده ساعتی"),
+                               tags$div(class="badge", tags$i(class="fa fa-trophy"), "Benchmark · ۱۱ مدل · ارزیابی روی داده ساعتی"),
                                tags$h2("رتبه‌بندی مدل‌های پیش‌بینی"),
-                               tags$p("ارزیابی جامع ۱۲ مدل بر اساس  ۲۴ ساعت اینده (افق ۳ روزه) دقیقاً مشابه تب پیش‌بینی."),
+                               tags$p("ارزیابی جامع ۱۱ مدل بر اساس ۲۴ ساعت آینده."),
                                uiOutput(ns("lb_stats_ui"))
                       )
                )
@@ -166,9 +166,10 @@ leaderboardServer <- function(id, weather_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
-    MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", tbats="#0d9488", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", svm="#ef4444", naive="#64748b", ensemble="#22c55e")
-    MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", tbats="TBATS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", svm="SVM", naive="Naïve", ensemble="AutoML Ensemble")
-    ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost", "svm")
+    # 🔴 حذف کامل SVM از رنگ‌ها، نام‌ها و لیست مدل‌های ML
+    MODEL_COLORS <- c(arima="#3b82f6", sarima="#60a5fa", ets="#14b8a6", tbats="#0d9488", prophet="#8b5cf6", rf="#f59e0b", xgboost="#d97706", lightgbm="#22d3ee", catboost="#fb7185", naive="#64748b", ensemble="#22c55e")
+    MODEL_LABELS <- c(arima="ARIMA", sarima="SARIMA", ets="ETS", tbats="TBATS", prophet="Prophet", rf="Random Forest", xgboost="XGBoost", lightgbm="LightGBM", catboost="CatBoost", naive="Naïve", ensemble="AutoML Ensemble")
+    ML_MODELS <- c("rf", "xgboost", "lightgbm", "catboost")
     
     observe({
       req(weather_data())
@@ -184,7 +185,6 @@ leaderboardServer <- function(id, weather_data) {
       target <- input$target_var
       req(sid %in% names(weather_data()))
       
-      # استفاده از timestamp برای داده ساعتی
       df <- weather_data()[[sid]] %>% dplyr::arrange(timestamp) %>% dplyr::filter(!is.na(.data[[target]]))
       
       if (nrow(df) < 240) { showNotification("برای بنچمارک ساعتی حداقل ۲۴۰ ساعت (۱۰ روز) داده نیاز است.", type="error"); return() }
@@ -193,7 +193,7 @@ leaderboardServer <- function(id, weather_data) {
         tryCatch({
           start_time <- Sys.time()
           
-          # افق پیش‌بینی ۷۲ ساعت (۳ روز)
+          # افق پیش‌بینی ۲۴ ساعت
           test_h <- 24
           if (nrow(df) <= test_h) test_h <- floor(nrow(df) / 4)
           
@@ -201,8 +201,8 @@ leaderboardServer <- function(id, weather_data) {
           test_df <- tail(df, test_h)
           test_vals <- test_df[[target]]
           
-          # ۱۱ مدل پایه
-          model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive")
+          # ۱۰ مدل پایه (حذف SVM)
+          model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","naive")
           
           all_metrics <- list()
           all_speed <- list()
@@ -220,7 +220,6 @@ leaderboardServer <- function(id, weather_data) {
             
             t_start <- Sys.time()
             
-            # استفاده از run_hourly_model دقیقا مثل تب پیش‌بینی
             fc <- tryCatch(
               run_hourly_model(mn, train_df, test_h, target, use_multivariate = TRUE),
               error = function(e) { message("خطا در مدل ", mn, ": ", e$message); NULL }
@@ -233,7 +232,6 @@ leaderboardServer <- function(id, weather_data) {
               preds <- fc$predictions[seq_len(min(test_h, length(fc$predictions)))]
               actual <- test_vals[seq_len(length(preds))]
               
-              # فیلتر مقادیر نامعتبر
               actual <- as.numeric(actual)
               preds <- as.numeric(preds)
               valid <- !is.na(actual) & !is.na(preds) & is.finite(actual) & is.finite(preds)
@@ -263,6 +261,9 @@ leaderboardServer <- function(id, weather_data) {
               all_metrics[[mn]] <- tibble::tibble(model=mn, RMSE=NA_real_, MAE=NA_real_, MAPE=NA_real_, R2=NA_real_, SMAPE=NA_real_)
               all_speed[[mn]] <- tibble::tibble(model_id=mn, exec_time=NA_real_)
             }
+            
+            rm(fc)
+            gc(verbose = FALSE)
           }
           
           # ── ۲. محاسبه انسمبل هوشمند ──
@@ -323,12 +324,13 @@ leaderboardServer <- function(id, weather_data) {
           
           stability_df <- tibble::tibble(
             model_id = rownames(window_ranks),
-            mean_rank = rowMeans(window_ranks, na.rm=TRUE),
-            rank_sd = apply(window_ranks, 1, sd, na.rm=TRUE),
+            mean_rank = apply(window_ranks, 1, function(x) mean(x, na.rm=TRUE)),
+            rank_sd = apply(window_ranks, 1, function(x) sd(x, na.rm=TRUE)),
             wins = rowSums(window_ranks == 1, na.rm=TRUE)
           ) %>%
             dplyr::mutate(
-              stability_score = round(pmax(0, pmin(100, 100 - ((mean_rank - 1) * 8) - ifelse(is.na(rank_sd), 0, rank_sd * 10))), 1)
+              rank_sd = ifelse(is.na(rank_sd), 0, rank_sd),
+              stability_score = ifelse(is.nan(mean_rank), 0, round(pmax(0, pmin(100, 100 - ((mean_rank - 1) * 8) - (rank_sd * 10))), 1))
             )
           
           total_time <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 2)
@@ -355,25 +357,36 @@ leaderboardServer <- function(id, weather_data) {
       req(weather_data(), input$target_var)
       target <- input$target_var
       stations <- names(weather_data())
-      model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","svm","naive", "ensemble")
+      # 🔴 10 مدل پایه + انسمبل (حذف SVM)
+      model_names <- c("arima","sarima","ets","tbats","prophet","rf","xgboost","lightgbm","catboost","naive", "ensemble")
       
-      withProgress(message="در حال اجرای بنچمارک منطقه‌ای ساعتی...", value=0, {
+      withProgress(message="در حال اجرای بنچمارک منطقه‌ای...", value=0, {
         res_matrix <- matrix(NA_real_, nrow=length(model_names), ncol=length(stations))
         rownames(res_matrix) <- sapply(model_names, function(m) MODEL_LABELS[[m]])
         colnames(res_matrix) <- sapply(stations, function(s) STATIONS[[s]]$name)
         
         for(i in seq_along(stations)) {
           sid <- stations[i]
-          df <- weather_data()[[sid]] %>% dplyr::filter(!is.na(.data[[target]]))
+          df <- weather_data()[[sid]] %>% dplyr::arrange(timestamp) %>% dplyr::filter(!is.na(.data[[target]]))
           if (nrow(df) < 240) next
           
-          test_h_reg <- 72
+          if (nrow(df) > 8760) {
+            df <- tail(df, 8760)
+          }
+          
+          test_h_reg <- 24
           train_df_reg <- head(df, nrow(df) - test_h_reg)
           test_df_reg <- tail(df, test_h_reg)
           station_preds <- list()
           
           for(j in seq_along(model_names)) {
             mn <- model_names[j]
+            
+            cat("\nRunning:", STATIONS[[sid]]$name, "| Model:", MODEL_LABELS[[mn]], "...\n")
+            flush.console()
+            
+            progress_val <- ( (i-1)*length(model_names) + j ) / (length(stations)*length(model_names))
+            setProgress(progress_val, detail = paste("ایستگاه:", STATIONS[[sid]]$name, "| مدل:", MODEL_LABELS[[mn]]))
             
             if (mn == "ensemble") {
               if (length(station_preds) >= 2) {
@@ -402,8 +415,8 @@ leaderboardServer <- function(id, weather_data) {
             }
             
             fc <- tryCatch(
-              run_hourly_model(mn, train_df, test_h, target, use_multivariate = TRUE),
-              error = function(e) { message("خطا در مدل ", mn, ": ", e$message); NULL }
+              run_hourly_model(mn, train_df_reg, test_h_reg, target, use_multivariate = TRUE),
+              error = function(e) NULL
             )
             if(!is.null(fc) && !is.null(fc$predictions) && length(fc$predictions) > 0) {
               preds <- fc$predictions[seq_len(min(test_h_reg, length(fc$predictions)))]
@@ -415,11 +428,13 @@ leaderboardServer <- function(id, weather_data) {
               preds_padded[seq_along(preds)] <- as.numeric(preds)
               station_preds[[mn]] <- preds_padded
             }
+            
+            rm(fc)
+            gc(verbose = FALSE)
           }
-          setProgress(i/length(stations))
         }
         regional_data(res_matrix)
-        showNotification("Heatmap منطقه‌ای ساعتی ساخته شد ✓", type="message")
+        showNotification("Heatmap منطقه‌ای با موفقیت ساخته شد ✓", type="message")
       })
     })
     
@@ -466,12 +481,20 @@ leaderboardServer <- function(id, weather_data) {
       if (nrow(res) < 3) rank_icons <- c("🥇","🥈")[seq_len(nrow(res))]
       
       display <- res %>%
-        dplyr::mutate(model_label = MODEL_LABELS[model] %||% model, rank_label = paste(rank_icons[rank], rank)) %>%
-        dplyr::select("رتبه"=rank_label, "مدل"=model_label, "RMSE"=RMSE, "MAE"=MAE, "R²"=R2, "نمره ترکیبی"=composite_score) %>%
+        dplyr::mutate(
+          model_label = MODEL_LABELS[model] %||% model, 
+          rank_label = paste(rank_icons[rank], rank)
+        ) %>%
+        dplyr::select("رتبه"=rank_label, "مدل"=model_label, "RMSE"=RMSE, "MAE"=MAE, "R²"=R2, "نمره نهایی (۱۰۰)"=composite_score) %>%
         dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
       
-      DT::datatable(display, options = list(pageLength = 12, dom = "t", scrollX = TRUE, order = list(list(5, "asc")), columnDefs = list(list(className = "dt-center", targets = "_all"))), rownames = FALSE, class = "cell-border stripe hover") %>%
-        DT::formatStyle("نمره ترکیبی", background = DT::styleColorBar(c(0, 1), "#3b82f6"), backgroundSize = "100% 70%", backgroundRepeat = "no-repeat", backgroundPosition = "center")
+      DT::datatable(display, options = list(pageLength = 12, dom = "t", scrollX = TRUE, 
+                                            order = list(list(5, "desc")), 
+                                            columnDefs = list(list(className = "dt-center", targets = "_all"))), 
+                    rownames = FALSE, class = "cell-border stripe hover") %>%
+        DT::formatStyle("نمره نهایی (۱۰۰)", 
+                        background = DT::styleColorBar(c(0, 100), "#22c55e"), 
+                        backgroundSize = "100% 70%", backgroundRepeat = "no-repeat", backgroundPosition = "center")
     })
     
     output$metric_bar_chart <- plotly::renderPlotly({
@@ -532,15 +555,18 @@ leaderboardServer <- function(id, weather_data) {
       req(benchmark_data())
       speed <- benchmark_data()$speed
       speed$model_label <- sapply(speed$model_id, function(m) MODEL_LABELS[[m]])
-      max_time <- max(speed$exec_time, na.rm = TRUE)
+      
+      valid_speeds <- speed$exec_time[!is.na(speed$exec_time) & is.finite(speed$exec_time) & speed$exec_time > 0]
+      max_time <- if(length(valid_speeds) > 0) max(valid_speeds) else 1
       
       bars <- lapply(seq_len(nrow(speed)), function(i) {
         row <- speed[i,]
-        width_pct <- round((row$exec_time / max_time) * 100, 1)
+        exec_t <- if(is.na(row$exec_time) || !is.finite(row$exec_time)) 0 else row$exec_time
+        width_pct <- round((exec_t / max_time) * 100, 1)
         color <- MODEL_COLORS[[row$model_id]]
         
         tags$div(class="speed-row",
-                 tags$div(class="speed-label", tags$span(row$model_label), tags$span(paste0(row$exec_time, "s"))),
+                 tags$div(class="speed-label", tags$span(row$model_label), tags$span(paste0(round(exec_t, 3), "s"))),
                  tags$div(class="speed-track", tags$div(class="speed-fill", style=paste0("width:", width_pct, "%; background:", color, ";")))
         )
       })
@@ -557,13 +583,13 @@ leaderboardServer <- function(id, weather_data) {
       
       best_acc_name <- MODEL_LABELS[[best_acc$model]]
       best_speed_name <- MODEL_LABELS[[best_speed$model_id]]
-      score <- round((1 - best_acc$composite_score) * 10, 1)
+      score <- round(best_acc$composite_score, 1)
       
       tags$div(
         class = "reco-card",
         tags$div(class = "reco-header", tags$i(class="fa fa-wand-magic-sparkles"), "مدل پیشنهادی سیستم"),
         tags$div(class = "reco-model", tags$i(class="fa fa-trophy", style="color:#fbbf24;"), best_acc_name),
-        tags$div(class = "reco-score", tags$i(class="fa fa-star"), tags$span(paste0("امتیاز کلی: ", score, " از 10"))),
+        tags$div(class = "reco-score", tags$i(class="fa fa-star"), tags$span(paste0("امتیاز کلی: ", score, " از 100"))),
         tags$div(class = "reco-why",
                  tags$div(tags$i(class="fa fa-bullseye"), tags$span(paste0("کمترین میزان خطا (RMSE: ", round(best_acc$RMSE, 2), ")"))),
                  tags$div(tags$i(class="fa fa-chart-line"), tags$span(paste0("بالاترین ضریب تعیین (R²: ", round(best_acc$R2, 3), ")"))),

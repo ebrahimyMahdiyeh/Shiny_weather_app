@@ -535,15 +535,19 @@ HOURLY_FEAT_COLS <- c(
 )
 
 .prepare_hourly_training_data <- function(hourly_df, target = "temperature", use_multivariate = FALSE) {
-  if (nrow(hourly_df) > 1440) hourly_df <- tail(hourly_df, 1440)
+  # 🔴 اصلاح بحرانی: حذف محدودیت 1440 ردیف (60 روز) 
+  # حالا مدل‌های ML روی کل 4 سال داده (حدود 35000 ردیف) آموزش می‌بینند
+  
   feat_df <- build_hourly_feature_matrix(hourly_df, target)
   if (nrow(feat_df) < 10) stop("داده کافی بعد از حذف NA باقی نمانده")
+  
   exog_vars <- setdiff(c("temperature", "humidity", "wind_speed", "precipitation"), target)
   if (isTRUE(use_multivariate)) {
     feat_use <- setdiff(intersect(HOURLY_FEAT_COLS, names(feat_df)), target)
   } else {
     feat_use <- setdiff(intersect(HOURLY_FEAT_COLS, names(feat_df)), c(target, exog_vars))
   }
+  
   list(feat_df = feat_df, feat_use = feat_use, X_train = as.matrix(feat_df[, feat_use, drop = FALSE]), y_train = feat_df[[target]], hourly_df = hourly_df)
 }
 
@@ -630,20 +634,20 @@ hourly_fallback_forecast <- function(hourly_df, horizon_h, target, method_suffix
 }
 
 # ── مدل‌های ML ساعتی ──
-
 forecast_hourly_xgboost <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   result <- tryCatch({
     prep <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
     set.seed(42)
-    params <- list(objective = "reg:squarederror", max_depth = 8, eta = 0.05, subsample = 0.8, colsample_bytree = 0.8, min_child_weight = 5, gamma = 0.1)
+    params <- list(objective = "reg:squarederror", max_depth = 6, eta = 0.1, subsample = 0.8, colsample_bytree = 0.8, min_child_weight = 5, gamma = 0.1)
     split <- .train_valid_split_idx(nrow(prep$X_train))
     if (!is.null(split)) {
       dtr <- xgboost::xgb.DMatrix(prep$X_train[split$train_idx, , drop = FALSE], label = prep$y_train[split$train_idx])
       dva <- xgboost::xgb.DMatrix(prep$X_train[split$valid_idx, , drop = FALSE], label = prep$y_train[split$valid_idx])
-      model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 1000, watchlist = list(train = dtr, valid = dva), early_stopping_rounds = 50, verbose = 0)
+      # 🔴 اصلاح: تغییر watchlist به evals
+      model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 1000, evals = list(train = dtr, valid = dva), early_stopping_rounds = 20, verbose = 0)
     } else {
       dtr <- xgboost::xgb.DMatrix(prep$X_train, label = prep$y_train)
-      model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 200, verbose = 0)
+      model <- xgboost::xgb.train(params = params, data = dtr, nrounds = 150, verbose = 0)
     }
     preds <- hourly_recursive_forecast(predict_fn = function(m, nd) stats::predict(m, xgboost::xgb.DMatrix(data.matrix(nd[, prep$feat_use, drop = FALSE]))), model = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = prep$feat_use)
     imp <- tryCatch(xgboost::xgb.importance(model = model), error = function(e) NULL)
@@ -714,24 +718,79 @@ forecast_hourly_catboost <- function(hourly_df, horizon_h = 24, target = "temper
 
 forecast_hourly_svm <- function(hourly_df, horizon_h = 24, target = "temperature", use_multivariate = FALSE) {
   result <- tryCatch({
+    # فراخوانی کتابخانه‌های موازی‌سازی
+    if (!requireNamespace("foreach", quietly = TRUE)) install.packages("foreach")
+    if (!requireNamespace("doParallel", quietly = TRUE)) install.packages("doParallel")
+    
     prep <- .prepare_hourly_training_data(hourly_df, target, use_multivariate)
     set.seed(42)
-    means <- colMeans(prep$X_train, na.rm = TRUE)
-    sds <- apply(prep$X_train, 2, sd, na.rm = TRUE)
-    sds[!is.finite(sds) | sds == 0] <- 1
-    X_train_scaled <- scale(prep$X_train, center = means, scale = sds)
     
-    model <- e1071::svm(x = X_train_scaled, y = prep$y_train, kernel = "radial", cost = 10, epsilon = 0.1)
-    preds <- hourly_recursive_forecast(predict_fn = function(m, nd) {
-      nd_scaled <- scale(data.matrix(nd[, prep$feat_use, drop = FALSE]), center = means, scale = sds)
-      stats::predict(m, newdata = nd_scaled)
-    }, model = model, train_df = prep$hourly_df, horizon_h = horizon_h, target = target, feat_use = prep$feat_use)
-    list(predictions = preds, method = paste0("SVM (ساعتی", ifelse(isTRUE(use_multivariate), "، چندمتغیره)", ")")))
-  }, error = function(e) { message("SVM ساعتی شکست خورد: ", conditionMessage(e)); NULL })
+    # استفاده از 10,000 سطر برای حفظ کامل چرخه‌ها و دقت بالا
+    n_train <- nrow(prep$X_train)
+    train_size <- min(n_train, 10000)
+    
+    X_train_raw <- tail(prep$X_train, train_size)
+    y_train_raw <- tail(prep$y_train, train_size)
+    
+    # نرمال‌سازی
+    means <- colMeans(X_train_raw, na.rm = TRUE)
+    sds <- apply(X_train_raw, 2, sd, na.rm = TRUE)
+    sds[!is.finite(sds) | sds == 0] <- 1
+    X_train_scaled <- scale(X_train_raw, center = means, scale = sds)
+    
+    last_known_x <- tail(X_train_scaled, 1)
+    
+    # 🔴 تنظیم موازی‌سازی رو هسته‌های پردازنده
+    num_cores <- max(1, parallel::detectCores() - 1)
+    cl <- parallel::makeCluster(num_cores)
+    doParallel::registerDoParallel(cl)
+    
+    # خروج ایمن کلستر در صورت بروز خطا
+    on.exit({
+      parallel::stopCluster(cl)
+      foreach::registerDoSEQ()
+    })
+    
+    # 🔴 اجرا هم‌زمان 24 مدل روی کلستر پردازنده
+    preds <- foreach::foreach(
+      h = 1:horizon_h, 
+      .combine = 'c', 
+      .packages = c("e1071", "dplyr")
+    ) %dopar% {
+      
+      y_h <- dplyr::lead(y_train_raw, h - 1)
+      valid_idx <- !is.na(y_h)
+      
+      X_h <- X_train_scaled[valid_idx, , drop = FALSE]
+      y_h <- y_h[valid_idx]
+      
+      model_h <- e1071::svm(
+        x = X_h, 
+        y = y_h, 
+        kernel = "radial", 
+        cost = 2.5, 
+        gamma = 1 / ncol(X_h), 
+        epsilon = 0.05, 
+        tolerance = 0.01,
+        max_iter = 3000
+      )
+      
+      stats::predict(model_h, newdata = last_known_x)
+    }
+    
+    # Clamping فیزیکی
+    hist_min <- min(y_train_raw, na.rm = TRUE) - 3
+    hist_max <- max(y_train_raw, na.rm = TRUE) + 3
+    preds <- pmin(pmax(preds, hist_min), hist_max)
+    
+    list(predictions = preds, method = paste0("SVM Direct Parallel (ساعتی", ifelse(isTRUE(use_multivariate), "، چندمتغیره)", ")")))
+  }, error = function(e) { 
+    message("SVM ساعتی شکست خورد: ", conditionMessage(e)); NULL 
+  })
+  
   if (!.valid_hourly_result(result, horizon_h)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — SVM"))
   result
 }
-
 # ── مدل‌های آماری ساعتی ──
 
 forecast_hourly_arima <- function(hourly_df, horizon_h = 24, target = "temperature") {
@@ -761,29 +820,67 @@ forecast_hourly_sarima <- function(hourly_df, horizon_h = 24, target = "temperat
 }
 
 forecast_hourly_ets <- function(hourly_df, horizon_h = 24, target = "temperature") {
-  vals <- hourly_df[[target]]
-  vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
-  vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
-  if (length(vals) > 720) vals <- tail(vals, 720)
-  if (length(vals) >= 3) {
-    vals_smoothed <- zoo::rollmean(vals, k = 3, fill = NA, align = "right")
-    vals_smoothed[is.na(vals_smoothed)] <- vals[is.na(vals_smoothed)]
-  } else {
-    vals_smoothed <- vals
+  result <- tryCatch({
+    vals <- hourly_df[[target]]
+    
+    # ۱. ترمیم مقادیر گمشده بدون دستکاری و صاف‌سازی متغیرهای اصلی
+    vals[is.na(vals)] <- zoo::na.approx(vals, na.rm = FALSE)[is.na(vals)]
+    vals[is.na(vals)] <- mean(vals, na.rm = TRUE)
+    
+    # ۲. استفاده از داده‌های ۷ روز اخیر (168 ساعت) جهت بازنمایی دقیق الگوهای ساعتی اخیر
+    if (length(vals) > 168) vals <- tail(vals, 168)
+    
+    # ۳. تعریف سری زمانی با تناوب 24 ساعته
+    ts_obj <- ts(vals, frequency = 24)
+    
+    # ۴. مدل‌سازی با stlm + ETS (بسیار دقیق‌تر از ets ساده برای داده ساعتی)
+    # در صورت بروز خطا، به مدل ets مستقیم با حالت هموارشده سوئیچ می‌کند
+    fit <- tryCatch({
+      forecast::stlm(ts_obj, s.window = "periodic", method = "ets")
+    }, error = function(e) {
+      forecast::ets(ts_obj, model = "ZZA")
+    })
+    
+    fc <- forecast::forecast(fit, h = horizon_h)
+    preds <- as.numeric(fc$mean)
+    
+    # ۵. استخراج بازه‌های اطمینان
+    lower_vals <- tryCatch({
+      if (is.matrix(fc$lower)) as.numeric(fc$lower[, "95%"]) else as.numeric(fc$lower)
+    }, error = function(e) rep(NA_real_, horizon_h))
+    
+    upper_vals <- tryCatch({
+      if (is.matrix(fc$upper)) as.numeric(fc$upper[, "95%"]) else as.numeric(fc$upper)
+    }, error = function(e) rep(NA_real_, horizon_h))
+    
+    # ۶. بررسی صحت پیش‌بینی
+    if (length(preds) != horizon_h || any(!is.finite(preds))) {
+      return(NULL)
+    }
+    
+    # بازسازی بازه اطمینان در صورت وجود ناپایداری
+    if (any(!is.finite(lower_vals)) || length(lower_vals) != horizon_h) {
+      sd_val <- ifelse(sd(vals, na.rm = TRUE) > 0, sd(vals, na.rm = TRUE), 1)
+      lower_vals <- preds - 1.96 * sd_val
+      upper_vals <- preds + 1.96 * sd_val
+    }
+    
+    # محدودسازی پیش‌بینی در محدوده منطقی دمایی اخیر
+    hist_min <- min(vals, na.rm = TRUE) - 4
+    hist_max <- max(vals, na.rm = TRUE) + 4
+    preds <- pmin(pmax(preds, hist_min), hist_max)
+    
+    list(predictions = preds, lower = lower_vals, upper = upper_vals, method = "ETS/STLM (Hourly)")
+    
+  }, error = function(e) {
+    message("ETS ساعتی شکست خورد: ", conditionMessage(e)); NULL
+  })
+  
+  if (is.null(result) || !.valid_hourly_result(result, horizon_h)) {
+    return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
   }
-  ts_obj <- ts(vals_smoothed, frequency = 24)
-  fc <- tryCatch(forecast::forecast(forecast::ets(ts_obj), h = horizon_h), error = function(e) tryCatch(forecast::stlf(ts_obj, h = horizon_h, method = "ets", s.window = 7, robust = TRUE), error = function(e2) NULL))
-  if (is.null(fc)) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
-  lower_vals <- tryCatch({ if (is.matrix(fc$lower)) as.numeric(fc$lower[, 2]) else as.numeric(fc$lower) }, error = function(e) rep(NA_real_, horizon_h))
-  upper_vals <- tryCatch({ if (is.matrix(fc$upper)) as.numeric(fc$upper[, 2]) else as.numeric(fc$upper) }, error = function(e) rep(NA_real_, horizon_h))
-  preds <- as.numeric(fc$mean)
-  if (length(preds) != horizon_h || any(!is.finite(preds))) return(hourly_fallback_forecast(hourly_df, horizon_h, target, " — ETS"))
-  if (any(!is.finite(lower_vals)) || length(lower_vals) != horizon_h) {
-    sd_val <- ifelse(sd(vals, na.rm = TRUE) > 0, sd(vals, na.rm = TRUE), 1)
-    lower_vals <- preds - 1.96 * sd_val
-    upper_vals <- preds + 1.96 * sd_val
-  }
-  list(predictions = preds, lower = lower_vals, upper = upper_vals, method = "ETS (Hourly)")
+  
+  result
 }
 
 forecast_hourly_tbats <- function(hourly_df, horizon_h = 24, target = "temperature") {

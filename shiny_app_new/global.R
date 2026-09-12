@@ -94,9 +94,9 @@ library(ggplot2)
 library(scales)
 
 # ── بارگذاری ماژول‌ها و توابع پروژه ─────────────────────────────────────────────
-source("R/data_utils.R", local = TRUE)
-source("R/modeling_utils.R", local = TRUE)
-source("R/metrics_utils.R", local = TRUE)
+source("R/data_utils.R", local = FALSE, encoding = "UTF-8")
+source("R/modeling_utils.R", local = FALSE, encoding = "UTF-8")
+source("R/metrics_utils.R", local = FALSE, encoding = "UTF-8")
 
 source("modules/home_module.R", local = TRUE)
 source("modules/forecast_module.R", local = TRUE)
@@ -239,6 +239,22 @@ generate_sample_data <- function() {
     )
   }) |> purrr::set_names(names(STATIONS))
 }
+# 🔴 آپدیت هوشمند داده‌ها قبل از لود اپلیکیشن
+tryCatch({
+  # مسیر دقیق پوشه دیتا را مستقیم از working directory می‌گیرد
+  data_dir <- file.path(getwd(), "data")
+  
+  if (dir.exists(data_dir)) {
+    csv_files <- list.files(data_dir, pattern = "^weather_.*\\.csv$", full.names = TRUE)
+    if (length(csv_files) > 0) {
+      message("⏳ Checking for weather data updates in: ", data_dir)
+      incremental_update_csvs()
+    }
+  }
+}, error = function(e) {
+  message("⚠️ Auto-update failed: ", e$message)
+})
+
 
 # ── بارگذاری سراسری داده روزانه ────────────────────────────────────────────────
 WEATHER_DATA <- tryCatch(

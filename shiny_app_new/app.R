@@ -1,6 +1,6 @@
 # File: app.R — نسخه ۴ (Dark/Light mode + سایدبار راست)
 
-# ── اصلاح locale برای پشتیبانی فارسی (UTF-8) ────────────────────────────────د
+# ── اصلاح locale برای پشتیبانی فارسی (UTF-8) ────────────────────────────────
 tryCatch({
   if (.Platform$OS.type == "windows") {
     locs <- c("Persian_Iran.65001", "English_United States.65001",
@@ -822,7 +822,7 @@ ui <- shinydashboard::dashboardPage(
       shinydashboard::tabItem(tabName="anomaly",     anomalyUI("anomaly")),
       shinydashboard::tabItem(tabName="report",      reportUI("report")),
       
-      # ── راهنمای مدل‌ها ── (اصلاح کاما جا افتاده)
+      # ── راهنمای مدل‌ها ──
       shinydashboard::tabItem(tabName="model_guide",
                               
                               fluidRow(column(12,
@@ -834,7 +834,7 @@ ui <- shinydashboard::dashboardPage(
                                                        tags$div(class="hero-chips",
                                                                 tags$span(class="hchip hchip-blue",   tags$i(class="fa fa-layer-group"),    "۱۱ مدل پیش‌بینی"),
                                                                 tags$span(class="hchip hchip-amber",  tags$i(class="fa fa-shapes"),         "۳ دسته الگوریتمی"),
-                                                                tags$span(class="hchip hchip-teal",   tags$i(class="fa fa-ruler-combined"), "۵ معیار ارزیابی"),
+                                                                tags$span(class="hchip hchip-teal",   tags$i(class="fa fa-ruler-combined"), "۴ معیار ارزیابی"),
                                                                 tags$span(class="hchip hchip-purple", tags$i(class="fa fa-trophy"),         "۱ امتیاز ترکیبی")
                                                        )
                                               )
@@ -860,7 +860,6 @@ ui <- shinydashboard::dashboardPage(
                                                                       mg_compare_row("XGBoost",         "یادگیری ماشین",         "amber",  5, 4, 2),
                                                                       mg_compare_row("LightGBM",        "یادگیری ماشین",         "amber",  5, 5, 2),
                                                                       mg_compare_row("CatBoost",        "یادگیری ماشین",         "amber",  5, 3, 2),
-                                                                      mg_compare_row("SVM",             "یادگیری ماشین",         "amber",  3, 2, 2),
                                                                       mg_compare_row("Prophet",         "مدرن (دستی)",           "purple", 4, 3, 4),
                                                                       mg_compare_row("Naïve",           "بیس‌لاین (خودکار)",     "green",  1, 5, 5),
                                                                       mg_compare_row("AutoML Ensemble", "ترکیبی",                "green",  5, 2, 2)
@@ -942,13 +941,6 @@ ui <- shinydashboard::dashboardPage(
                                                                   formula_tex=r"(F_m(x) = F_{m-1}(x) + \eta \cdot h_m(x;\,D^{\text{ordered}}))",
                                                                   pros=c("مدیریت خودکار متغیرهای دسته‌ای","مقاوم در برابر overfitting","تنظیم hyperparameter ساده"),
                                                                   cons=c("آموزش کندتر از LightGBM","نیاز به رم بیشتر")
-                                                                ),
-                                                                mg_model_card(
-                                                                  icon="vector-square", color="amber", title="SVM",
-                                                                  badges=list(list("Kernel","badge-ml")),
-                                                                  desc="رگرسیون بردار پشتیبان با kernel RBF",
-                                                                  pros=c("مؤثر در فضای با ابعاد بالا"),
-                                                                  cons=c("کُند روی داده حجیم","نیاز به نرمال‌سازی")
                                                                 )
                                                               ),
                                                               
@@ -990,7 +982,7 @@ ui <- shinydashboard::dashboardPage(
                                          mg_metric_card(
                                            icon="ruler", hex="#60a5fa", title="RMSE",
                                            formula_tex=r"(\text{RMSE} = \sqrt{\dfrac{\sum (y-\hat y)^2}{n}})",
-                                           desc="جذر میانگین مربعات خطا — حساس به خطاهای بزرگ", weight=0.25
+                                           desc="جذر میانگین مربعات خطا — حساس به خطاهای بزرگ", weight=0.30
                                          ),
                                          mg_metric_card(
                                            icon="scale-balanced", hex="#2dd4bf", title="MAE",
@@ -998,34 +990,28 @@ ui <- shinydashboard::dashboardPage(
                                            desc="میانگین قدر مطلق خطا — مقاوم در برابر outlier", weight=0.20
                                          ),
                                          mg_metric_card(
-                                           icon="percent", hex="#fbbf24", title="MAPE",
-                                           formula_tex=r"(\text{MAPE} = \dfrac{1}{n}\sum \dfrac{|y-\hat y|}{|y|}\times 100)",
-                                           desc="میانگین درصد قدر مطلق خطا — درصد خطای نسبی", weight=0.20
+                                           icon="superscript", hex="#a78bfa", title="R²",
+                                           formula_tex=r"(R^2 = 1 - \dfrac{\sum (y-\hat y)^2}{\sum (y-\bar y)^2})",
+                                           desc="ضریب تعیین — بالاتر = بهتر (۰ تا ۱)", weight=0.30
                                          ),
                                          mg_metric_card(
                                            icon="shuffle", hex="#34d399", title="SMAPE",
                                            formula_tex=r"(\text{SMAPE} = \dfrac{1}{n}\sum \dfrac{|y-\hat y|}{(|y|+|\hat y|)/2}\times 100)",
-                                           desc="درصد خطای متقارن — پایدارتر از MAPE وقتی y نزدیک صفر است", weight=0.15
-                                         ),
-                                         mg_metric_card(
-                                           icon="superscript", hex="#a78bfa", title="R²",
-                                           formula_tex=r"(R^2 = 1 - \dfrac{\sum (y-\hat y)^2}{\sum (y-\bar y)^2})",
-                                           desc="ضریب تعیین — بالاتر = بهتر (۰ تا ۱)", weight=0.20
+                                           desc="درصد خطای متقارن — پایدارتر از MAPE وقتی y نزدیک صفر است", weight=0.20
                                          ),
                                          
                                          tags$div(class="composite-panel",
                                                   tags$div(class="cp-title", tags$i(class="fa fa-trophy"), "نمره ترکیبی"),
                                                   tags$div(class="stack-bar",
-                                                           tags$div(style="flex:25;background:#60a5fa;"),
+                                                           tags$div(style="flex:30;background:#60a5fa;"),
                                                            tags$div(style="flex:20;background:#2dd4bf;"),
-                                                           tags$div(style="flex:20;background:#fbbf24;"),
-                                                           tags$div(style="flex:15;background:#34d399;"),
-                                                           tags$div(style="flex:20;background:#a78bfa;")
+                                                           tags$div(style="flex:30;background:#a78bfa;"),
+                                                           tags$div(style="flex:20;background:#34d399;")
                                                   ),
                                                   tags$div(class="formula-box", style="margin:0 0 2px;",
                                                            tags$div(class="formula-scroll tex-formula",
-                                                                    `data-tex`=r"(\text{Score}=0.25\,n_{RMSE}+0.20\,n_{MAE}+0.20\,n_{MAPE}+0.15\,n_{SMAPE}+0.20\,n_{R^2})")),
-                                                  tags$div(class="cp-note", "نرمال‌سازی min-max روی همه مدل‌ها · عدد کمتر = عملکرد بهتر")
+                                                                    `data-tex`=r"(\text{Score} = 0.30\,n_{RMSE} + 0.20\,n_{MAE} + 0.30\,n_{R^2} + 0.20\,n_{SMAPE})")),
+                                                  tags$div(class="cp-note", "نرمال‌سازی min-max روی همه مدل‌ها · عدد بیشتر = عملکرد بهتر")
                                          )
                                        )
                                 )
@@ -1053,5 +1039,4 @@ server <- function(input, output, session) {
                leaderboard_rv  = leaderboard_rv)
 }
 
-# اجرای اپلیکیشن به‌صورت استاندارد
 shinyApp(ui, server)

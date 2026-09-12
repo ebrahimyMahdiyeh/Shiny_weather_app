@@ -61,33 +61,44 @@ compute_all_metrics <- function(actual, predicted, model_name = "model") {
 # ── نمره ترکیبی نرمال‌شده برای رتبه‌بندی ────────────────────────────────────────
 # نمره پایین‌تر بهتر است (مشابه رتبه‌بندی گلف)
 compute_composite_score <- function(metrics_df) {
-  # نرمال‌سازی min-max برای هر معیار
-  normalize_col <- function(x, lower_is_better = TRUE) {
-    rng <- range(x, na.rm = TRUE)
-    if (diff(rng) == 0) return(rep(0.5, length(x)))
-    normed <- (x - rng[1]) / (rng[2] - rng[1])
-    if (lower_is_better) normed else 1 - normed
+  # 🔴 روش استاندارد Relative Accuracy Score (0 to 100)
+  
+  # فیلتر کردن مدل‌های کرش کرده برای پیدا کردن بهترین‌ها
+  valid_metrics <- metrics_df %>% 
+    dplyr::filter(!is.na(RMSE), !is.na(MAE), is.finite(RMSE), is.finite(MAE), is.finite(R2))
+  
+  if (nrow(valid_metrics) == 0) {
+    metrics_df$composite_score <- 0
+    return(metrics_df)
   }
-
-  metrics_df %>%
+  
+  # پیدا کردن بهترین مقادیر (کمترین خطا و بیشترین R²)
+  min_rmse <- min(valid_metrics$RMSE, na.rm = TRUE)
+  min_mae  <- min(valid_metrics$MAE, na.rm = TRUE)
+  
+  # محاسبه نمره هر مدل (نسبت به بهترین مدل)
+  metrics_df <- metrics_df %>%
     dplyr::mutate(
-      n_RMSE  = normalize_col(RMSE,  lower_is_better = TRUE),
-      n_MAE   = normalize_col(MAE,   lower_is_better = TRUE),
-      n_MAPE  = normalize_col(MAPE,  lower_is_better = TRUE),
-      n_R2    = normalize_col(R2,    lower_is_better = FALSE),
-      n_SMAPE = normalize_col(SMAPE, lower_is_better = TRUE),
-      # میانگین وزن‌دار معیارها
-      composite_score = round(
-        0.25 * n_RMSE +
-          0.20 * n_MAE  +
-          0.20 * n_MAPE +
-          0.20 * n_R2   +
-          0.15 * n_SMAPE,
-        4
-      )
+      # نمره RMSE: اگر خطا 2 برابر بهترین باشد، نمره 50 می‌گیرد
+      score_rmse = ifelse(is.na(RMSE) | !is.finite(RMSE) | RMSE == 0, 0, 100 * (min_rmse / RMSE)),
+      
+      # نمره MAE
+      score_mae  = ifelse(is.na(MAE) | !is.finite(MAE) | MAE == 0, 0, 100 * (min_mae / MAE)),
+      
+      # نمره R²: بین 0 تا 100 (اگر منفی شد، صفر می‌گیرد)
+      score_r2   = 100 * pmax(0, pmin(1, R2)),
+      
+      # نمره SMAPE: تبدیل درصد خطا به نمره (خطای صفر = نمره 100)
+      score_smape = ifelse(is.na(SMAPE) | !is.finite(SMAPE), 0, 100 * (1 - (SMAPE / 100))),
+      score_smape = pmax(0, pmin(100, score_smape))
     ) %>%
-    dplyr::select(-dplyr::starts_with("n_")) %>%
-    dplyr::arrange(composite_score)
+    dplyr::mutate(
+      # 🔴 وزن‌دهی استاندارد: دقت خطی (RMSE, MAE) 70% و دقت زاویه‌ای/درصدی (R², SMAPE) 30%
+      composite_score = round((0.35 * score_rmse) + (0.25 * score_mae) + (0.20 * score_r2) + (0.20 * score_smape), 1)
+    ) %>%
+    dplyr::arrange(dplyr::desc(composite_score))
+  
+  return(metrics_df)
 }
 
 # ── ارزیابی مدل روی مجموعه آزمون ────────────────────────────────────────────
